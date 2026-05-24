@@ -3,7 +3,7 @@
   "data_local": "LST+TACO+Tyumen-1/data.yaml",
   "data_colab": "/content/drive/MyDrive/rubbish-detector/LST+TACO+Tyumen-1/data.yaml",
   "epochs": 30,
-  "imgsz": 640,
+  "imgsz": 1024,
   "batch": 8,
   "workers": 4,
   "optimizer": "SGD",
