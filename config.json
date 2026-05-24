@@ -10,5 +10,5 @@
   "plots": true,
   "project_local": "runs",
   "project_colab": "/content/drive/MyDrive/rubbish-detector/runs",
-  "name": "trash_yolov8"
+  "name": "rubbish-detector-yolov8"
 }
