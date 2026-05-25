@@ -37,11 +37,8 @@ def run_training(config_path: str = "config.json"):
     colab = is_colab()
     device = get_device()
 
-    data_path = config["data_colab"] if colab else config["data_local"]
+    data_path = config["data"]
     project_path = config["project_colab"] if colab else config["project_local"]
-
-    if not os.path.exists(data_path):
-        download_dataset()
 
     print("Среда:", "Google Colab" if colab else "Локальный ПК")
     print("Датасет:", data_path)
@@ -66,4 +63,6 @@ def run_training(config_path: str = "config.json"):
 
 
 if __name__ == "__main__":
+    if not os.path.exists(load_config()['data']):
+        download_dataset()
     run_training()
