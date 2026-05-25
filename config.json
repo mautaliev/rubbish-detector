@@ -1,7 +1,8 @@
 {
-  "model": "yolov8m.pt",
-  "data": "Tyumen-Rubbish-3/data.yaml",
-  "epochs": 30,
+  "model": "yolov8s.pt",
+  "data": "Tyumen-Rubbish-2-1/data.yaml",
+  "epochs": 200,
+  "patience": 20,
   "imgsz": 1024,
   "batch": 8,
   "workers": 4,
@@ -9,5 +10,5 @@
   "plots": true,
   "project_local": "runs",
   "project_colab": "/content/drive/MyDrive/rubbish-detector/runs",
-  "name": "tyumen-only"
+  "name": "tyumen-only-1"
 }
