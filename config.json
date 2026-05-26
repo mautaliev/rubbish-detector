@@ -2,7 +2,6 @@
   "model": "yolov8s.pt",
   "data": "Tyumen-Rubbish-2-1/data.yaml",
   "epochs": 200,
-  "patience": 20,
   "imgsz": 1024,
   "batch": 8,
   "workers": 4,

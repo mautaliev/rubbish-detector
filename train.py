@@ -57,7 +57,6 @@ def run_training(config_path: str = "config.json"):
         plots=config["plots"],
         project=project_path,
         name=config["name"],
-        patience=config["patience"]
     )
 
     return results
