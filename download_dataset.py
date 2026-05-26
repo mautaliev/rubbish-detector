@@ -5,8 +5,8 @@ from roboflow import Roboflow
 
 def download():
     rf = Roboflow(api_key=get_api_key())
-    project = rf.workspace("mautaliev").project("lst-taco-tyumen")
-    version = project.version(1)
+    project = rf.workspace("mautaliev").project("ltt-rubbishdataset-5c")
+    version = project.version(2)
     version.download("yolov8")
 
 

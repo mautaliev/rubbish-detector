@@ -1,6 +1,6 @@
 {
   "model": "yolov8m.pt",
-  "data": "LST+TACO+Tyumen-1/data.yaml",
+  "data": "LTT-RubbishDataset-5c-2/data.yaml",
   "epochs": 100,
   "patience": 20,
   "imgsz": 1024,
