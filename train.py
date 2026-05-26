@@ -45,22 +45,18 @@ def run_training(config_path: str = "config.json"):
     print("Папка результатов:", project_path)
 
     model = YOLO(config["model"])
-
     results = model.train(
         data=data_path,
+        project=project_path,
+        device=device,
         epochs=config["epochs"],
         patience=config["patience"],
         imgsz=config["imgsz"],
         batch=config["batch"],
-        device=device,
         workers=config["workers"],
-        optimizer=config["optimizer"],
         plots=config["plots"],
-        project=project_path,
         name=config["name"],
-        lr0=config["lr0"]
     )
-
     return results
 
 
