@@ -1,5 +1,5 @@
 {
-  "model": "/content/drive/MyDrive/rubbish-detector/runs/rubbish-detector-yolov8/weights/best.pt",
+  "model": "/content/drive/MyDrive/rubbish-detector/runs/rubbish-detector-yolov8/weights/last.pt",
   "data": "LST+TACO+Tyumen-1/data.yaml",
   "epochs": 100,
   "imgsz": 640,
@@ -9,5 +9,5 @@
   "plots": true,
   "project_local": "runs",
   "project_colab": "/content/drive/MyDrive/rubbish-detector/runs",
-  "name": "rubbish-detector-yolov8"
+  "name": "rubbish-detector-yolov8-resume"
 }
