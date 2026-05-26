@@ -50,7 +50,6 @@ def run_training(config_path: str = "config.json"):
         project=project_path,
         device=device,
         epochs=config["epochs"],
-        patience=config["patience"],
         imgsz=config["imgsz"],
         batch=config["batch"],
         workers=config["workers"],
