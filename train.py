@@ -49,6 +49,7 @@ def run_training(config_path: str = "config.json"):
     results = model.train(
         data=data_path,
         epochs=config["epochs"],
+        patience=config["patience"],
         imgsz=config["imgsz"],
         batch=config["batch"],
         device=device,
@@ -56,7 +57,8 @@ def run_training(config_path: str = "config.json"):
         optimizer=config["optimizer"],
         plots=config["plots"],
         project=project_path,
-        name=config["name"]
+        name=config["name"],
+        lr0=config["lr0"]
     )
 
     return results
