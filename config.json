@@ -1,8 +1,8 @@
 {
-  "model": "yolov8m.pt",
+  "model": "/content/drive/MyDrive/rubbish-detector/runs/rubbish-detector-yolov8/weights/best.pt",
   "data": "LST+TACO+Tyumen-1/data.yaml",
-  "epochs": 30,
-  "imgsz": 1024,
+  "epochs": 100,
+  "imgsz": 640,
   "batch": 8,
   "workers": 4,
   "optimizer": "SGD",

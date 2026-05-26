@@ -47,16 +47,8 @@ def run_training(config_path: str = "config.json"):
     model = YOLO(config["model"])
 
     results = model.train(
-        data=data_path,
+        resume=True,
         epochs=config["epochs"],
-        imgsz=config["imgsz"],
-        batch=config["batch"],
-        device=device,
-        workers=config["workers"],
-        optimizer=config["optimizer"],
-        plots=config["plots"],
-        project=project_path,
-        name=config["name"]
     )
 
     return results
