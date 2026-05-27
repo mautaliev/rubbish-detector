@@ -1,6 +1,6 @@
 {
   "model": "yolov8m.pt",
-  "data": "LTT-RubbishDataset-5c-2/data.yaml",
+  "data": "LTT-RubbishDataset-1c-1/data.yaml",
   "epochs": 100,
   "patience": 20,
   "imgsz": 1024,
@@ -9,5 +9,5 @@
   "plots": true,
   "project_local": "runs",
   "project_colab": "/content/drive/MyDrive/rubbish-detector/runs",
-  "name": "v2"
+  "name": "v3"
 }
