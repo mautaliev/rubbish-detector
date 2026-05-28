@@ -166,21 +166,39 @@ button:disabled {
     margin-bottom: 24px;
 }
 
-.privacy-content {
-    display: grid;
-    gap: 18px;
+.secondary-button {
+    display: inline-block;
+    margin-bottom: 22px;
+    padding: 10px 16px;
+
+    border: 1px solid #d0d5dd;
+    border-radius: 12px;
+
+    background: #ffffff;
+    color: #344054;
+
+    font-size: 14px;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.secondary-button:hover {
+    background: #f2f4f7;
 }
 
 .privacy-section {
+    margin-top: 14px;
     padding: 18px 20px;
+
     border: 1px solid #e5e7eb;
     border-radius: 14px;
-    background: #ffffff;
+
+    background: #f9fafb;
 }
 
 .privacy-section h2 {
     margin: 0 0 8px;
-    font-size: 20px;
+    font-size: 18px;
 }
 
 .privacy-section p {
