@@ -5,12 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Rubbish Detector</title>
   <link rel="stylesheet" href="/static/style.css" />
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 </head>
 <body>
   <main class="page">
     <section class="card">
-      <h1>Поиск мусора на изображении</h1>
-      <p class="hint">Загрузите изображение и нажмите «Проверить».</p>
+      <h1>Интеллектуальная система мониторинга антропогенного загрязнения городской среды</h1>
+      <p class="hint">Загрузите изображение для поиска источников антропогенного загрязнения и нажмите «Проверить».</p>
 
       <label class="upload">
         <input id="imageInput" type="file" accept="image/*" />
@@ -25,7 +26,7 @@
       <div class="controls">
         <label class="checkbox">
           <input id="detectClass" type="checkbox" />
-          <span>Дополнительно попробовать определить класс мусора</span>
+          <span>Дополнительно попробовать определить класс источника загрязнения</span>
         </label>
 
         <button id="checkButton" type="button" disabled>Проверить</button>

@@ -49,7 +49,7 @@ checkButton.addEventListener('click', async () => {
     const data = await response.json();
 
     if (!data.image_base64 || !data.found || data.total === 0) {
-      result.innerHTML = '<span class="success">Мусор не найден.</span>';
+      result.innerHTML = '<span class="success">Загрязнения не найдены.</span>';
       return;
     }
 
@@ -68,7 +68,7 @@ function renderFound(data) {
     .join('');
 
   return `
-    <div class="success">Обнаружено предметов: ${data.total}</div>
+    <div class="success">Обнаружено загрязнений: ${data.total}</div>
     <ul>${items}</ul>
   `;
 }
