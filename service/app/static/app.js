@@ -28,7 +28,7 @@ checkButton.addEventListener('click', async () => {
   if (!selectedFile) return;
 
   checkButton.disabled = true;
-  result.innerHTML = 'Выполняется проверка изображения...';
+  result.innerHTML = 'Выполняется проверка изображения... Ожидание может занять до минуты.';
 
   const formData = new FormData();
   formData.append('file', selectedFile);
