@@ -1,4 +1,6 @@
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from datetime import datetime
+
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -7,6 +9,23 @@ from .schemas import DetectRequest, DetectResponse
 
 app = FastAPI(title="Rubbish Detector API", version="1.0.0")
 app.mount("/static", StaticFiles(directory="service/app/static"), name="static")
+
+LOG_PATH = "requests.log.txt"
+
+
+def write_log(ip: str, path: str, body: str) -> None:
+    """Записывает строку запроса в лог-файл.
+
+    Args:
+        ip: IP-адрес отправителя запроса.
+        path: Путь эндпоинта, на который пришёл запрос.
+        body: Описание тела запроса (файлы заменены строкой с размером).
+    """
+    with open(LOG_PATH, "a", encoding="utf-8") as log_file:
+        log_file.write(
+            f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] "
+            f"ip={ip} POST {path} {body}\n"
+        )
 
 
 @app.get("/")
@@ -22,15 +41,22 @@ async def privacy():
 
 
 @app.post("/api/detect", response_model=DetectResponse)
-def detect_from_base64(payload: DetectRequest):
+def detect_from_base64(payload: DetectRequest, request: Request):
     """Принимает изображение в формате base64 и возвращает результат детекции мусора.
 
     Args:
         payload: Тело запроса с полями image_base64, detect_class и conf.
+        request: Объект HTTP-запроса (используется для получения IP отправителя).
 
     Returns:
         DetectResponse: Аннотированное изображение в base64, найденные объекты и их общее количество.
     """
+    image_size = len(payload.image_base64.encode())
+    write_log(
+        ip=request.client.host,
+        path="/api/detect",
+        body=f"image=[base64, {image_size} bytes] detect_class={payload.detect_class} conf={payload.conf}",
+    )
     try:
         image = decode_image(payload.image_base64)
         result = detect(image, detect_class=payload.detect_class, conf=payload.conf)
@@ -49,6 +75,7 @@ def detect_from_base64(payload: DetectRequest):
 
 @app.post("/api/detect-file")
 async def detect_from_file(
+    request: Request,
     file: UploadFile = File(...),
     detect_class: bool = Form(False),
     conf: float = Form(0.25),
@@ -56,6 +83,7 @@ async def detect_from_file(
     """Принимает изображение как multipart/form-data файл и возвращает результат детекции мусора.
 
     Args:
+        request: Объект HTTP-запроса (используется для получения IP отправителя).
         file: Загружаемый файл изображения.
         detect_class: Если True — используется 5-классовая модель с разбивкой по типам мусора.
         conf: Порог уверенности модели от 0 до 1.
@@ -65,6 +93,11 @@ async def detect_from_file(
     """
     try:
         data = await file.read()
+        write_log(
+            ip=request.client.host,
+            path="/api/detect-file",
+            body=f"file=[{file.filename}, {len(data)} bytes] detect_class={detect_class} conf={conf}",
+        )
         image_base64 = encode_bytes_to_base64(data)
         image = decode_image(image_base64)
         result = detect(image, detect_class=detect_class, conf=conf)
