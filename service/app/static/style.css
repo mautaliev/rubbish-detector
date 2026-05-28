@@ -190,3 +190,8 @@ button:disabled {
     color: #475467;
     line-height: 1.6;
 }
+
+.privacy-btn-wrapper {
+    text-align: center;
+    margin-top: 24px;
+}

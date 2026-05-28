@@ -2,22 +2,6 @@
 
 FastAPI-сервис для запуска обученных YOLO-моделей через веб-страницу и JSON API.
 
-## Структура
-
-```text
-service/
-  app/
-    main.py
-    detector.py
-    schemas.py
-    static/
-      index.html
-      style.css
-      app.js
-  requirements-service.txt
-  README.md
-```
-
 ## Модели
 
 В корне репозитория должны лежать файлы:
@@ -87,3 +71,10 @@ http://localhost:8000/docs
   "total": 0
 }
 ```
+
+## Disclaimer
+
+This project is published for educational and research purposes only.
+
+The model was trained using publicly available datasets.  
+Please check dataset licenses before any commercial usage.
