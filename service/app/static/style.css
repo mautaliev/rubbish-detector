@@ -124,38 +124,22 @@ button:disabled {
 }
 
 .page-links {
-    margin-top: 24px;
-    padding-top: 18px;
-    border-top: 1px solid #e5e7eb;
-    text-align: center;
+  margin-top: 28px;
+  padding-top: 8px;
+  text-align: center;
 }
 
-.back-button {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-
-    padding: 10px 16px;
-    margin-bottom: 20px;
-
-    background: #1d4ed8;
-    color: #ffffff;
-
-    border-radius: 10px;
-
-    font-size: 14px;
-    font-weight: 600;
-
-    text-decoration: none;
-
-    transition:
-        background 0.2s ease,
-        transform 0.15s ease;
+.page-links .privacy-button {
+  margin: 0 auto;
+  color: #17202a;
+  text-decoration: none;
 }
 
-.back-button:hover {
-    background: #1e40af;
-    transform: translateY(-1px);
+.page-links .privacy-button:hover {
+  color: #17202a;
+  text-decoration: none;
+  border-color: #667085;
+  background: #f8fafc;
 }
 
 .privacy-card {
