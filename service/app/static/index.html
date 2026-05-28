@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rubbish Detector</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <main class="page">
+    <section class="card">
+      <h1>Поиск мусора на изображении</h1>
+      <p class="hint">Загрузите изображение и нажмите «Проверить».</p>
+
+      <label class="upload">
+        <input id="imageInput" type="file" accept="image/*" />
+        <span>Выбрать изображение</span>
+      </label>
+
+      <div class="preview-wrap">
+        <img id="preview" class="preview hidden" alt="Загруженное изображение" />
+        <div id="placeholder" class="placeholder">Изображение пока не выбрано</div>
+      </div>
+
+      <div class="controls">
+        <label class="checkbox">
+          <input id="detectClass" type="checkbox" />
+          <span>Дополнительно попробовать определить класс мусора</span>
+        </label>
+
+        <button id="checkButton" type="button" disabled>Проверить</button>
+      </div>
+
+      <div id="result" class="result"></div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

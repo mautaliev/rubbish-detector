@@ -1,4 +1,5 @@
 .idea/
+.venv/
 LST+TACO+Tyumen-1/
 runs/
 api_keys.json
