@@ -16,23 +16,58 @@ _model_5c: Optional[YOLO] = None
 
 
 def _strip_data_url(value: str) -> str:
+    """Убирает префикс data URL и возвращает чистую base64-строку.
+
+    Args:
+        value: Строка в формате base64 или data URL (например, 'data:image/jpeg;base64,...').
+
+    Returns:
+        str: Чистая base64-строка без префикса data URL.
+    """
     if "," in value and value.strip().startswith("data:"):
         return value.split(",", 1)[1]
     return value
 
 
 def decode_image(image_base64: str) -> Image.Image:
+    """Декодирует base64-строку или data URL в RGB PIL-изображение.
+
+    Args:
+        image_base64: Изображение в формате base64 или data URL.
+
+    Returns:
+        Image.Image: Декодированное изображение в цветовом режиме RGB.
+    """
     raw = base64.b64decode(_strip_data_url(image_base64))
     return Image.open(io.BytesIO(raw)).convert("RGB")
 
 
 def encode_image(image: Image.Image) -> str:
+    """Кодирует PIL-изображение в base64-строку в формате JPEG.
+
+    Args:
+        image: PIL-изображение для кодирования.
+
+    Returns:
+        str: Изображение в формате base64.
+    """
     buffer = io.BytesIO()
     image.save(buffer, format="JPEG", quality=92)
     return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 
 def _load_model(detect_class: bool) -> YOLO:
+    """Загружает и кэширует YOLO-модель.
+
+    Args:
+        detect_class: Если True — загружается 5-классовая модель, иначе 1-классовая.
+
+    Returns:
+        YOLO: Загруженная модель.
+
+    Raises:
+        FileNotFoundError: Если файл модели не найден.
+    """
     global _model_1c, _model_5c
 
     model_path = MODEL_5C_PATH if detect_class else MODEL_1C_PATH
@@ -50,6 +85,16 @@ def _load_model(detect_class: bool) -> YOLO:
 
 
 def _class_name(model: YOLO, class_id: int, detect_class: bool) -> str:
+    """Возвращает название класса обнаруженного объекта.
+
+    Args:
+        model: Загруженная YOLO-модель со словарём классов.
+        class_id: Числовой идентификатор класса из предсказания модели.
+        detect_class: Если False — всегда возвращает 'rubbish' независимо от class_id.
+
+    Returns:
+        str: Название класса объекта.
+    """
     if not detect_class:
         return "rubbish"
     names = getattr(model, "names", {}) or {}
@@ -57,8 +102,15 @@ def _class_name(model: YOLO, class_id: int, detect_class: bool) -> str:
 
 
 def _draw_box(draw: ImageDraw.ImageDraw, box, label: str) -> None:
+    """Рисует ограничивающий прямоугольник и подпись на изображении.
+
+    Args:
+        draw: Объект ImageDraw для рисования на изображении.
+        box: Координаты прямоугольника в формате [x1, y1, x2, y2].
+        label: Текст подписи (название класса и уверенность модели).
+    """
     x1, y1, x2, y2 = [int(v) for v in box]
-    width = max(2, round((x2 - x1 + y2 - y1) / 250))
+    width = max(2, round((x2 - x1 + y2 - y1) / 250)) * 3
 
     draw.rectangle((x1, y1, x2, y2), outline="red", width=width)
 
@@ -77,6 +129,19 @@ def _draw_box(draw: ImageDraw.ImageDraw, box, label: str) -> None:
 
 
 def detect(image: Image.Image, detect_class: bool = False, conf: float = 0.25) -> dict:
+    """Запускает детекцию мусора на изображении.
+
+    Args:
+        image: Входное PIL-изображение для анализа.
+        detect_class: Если True — используется 5-классовая модель с разбивкой по типам мусора.
+        conf: Порог уверенности модели от 0 до 1; объекты ниже порога отбрасываются.
+
+    Returns:
+        dict: Словарь с ключами:
+            - image (Image.Image | None): Изображение с нанесёнными рамками или None если ничего не найдено.
+            - found (dict | None): Словарь вида {название_класса: {"count": N}} или None.
+            - total (int): Общее количество обнаруженных объектов.
+    """
     model = _load_model(detect_class)
     results = model.predict(image, conf=conf, verbose=False)
     result = results[0]

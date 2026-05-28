@@ -11,24 +11,25 @@ app.mount("/static", StaticFiles(directory="service/app/static"), name="static")
 
 @app.get("/")
 def index():
-    """
-    Главная страница сервиса
-    :return: HTML-ответ
-    """
+    """Возвращает главную HTML-страницу сервиса."""
     return FileResponse("service/app/static/index.html")
 
 
 @app.get("/privacy")
 async def privacy():
+    """Возвращает страницу политики конфиденциальности."""
     return FileResponse("service/app/static/privacy.html")
 
 
 @app.post("/api/detect", response_model=DetectResponse)
 def detect_from_base64(payload: DetectRequest):
-    """
-    Распознавание изображения из base64 формата
-    :param payload: тело запроса
-    :return:
+    """Принимает изображение в формате base64 и возвращает результат детекции мусора.
+
+    Args:
+        payload: Тело запроса с полями image_base64, detect_class и conf.
+
+    Returns:
+        DetectResponse: Аннотированное изображение в base64, найденные объекты и их общее количество.
     """
     try:
         image = decode_image(payload.image_base64)
@@ -52,6 +53,16 @@ async def detect_from_file(
     detect_class: bool = Form(False),
     conf: float = Form(0.25),
 ):
+    """Принимает изображение как multipart/form-data файл и возвращает результат детекции мусора.
+
+    Args:
+        file: Загружаемый файл изображения.
+        detect_class: Если True — используется 5-классовая модель с разбивкой по типам мусора.
+        conf: Порог уверенности модели от 0 до 1.
+
+    Returns:
+        dict: Аннотированное изображение в base64, найденные объекты и их общее количество.
+    """
     try:
         data = await file.read()
         image_base64 = encode_bytes_to_base64(data)
@@ -71,6 +82,14 @@ async def detect_from_file(
 
 
 def encode_bytes_to_base64(data: bytes) -> str:
+    """Кодирует байты в base64-строку.
+
+    Args:
+        data: Бинарные данные для кодирования.
+
+    Returns:
+        str: Данные в формате base64.
+    """
     import base64
 
     return base64.b64encode(data).decode("utf-8")
