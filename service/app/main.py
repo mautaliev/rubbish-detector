@@ -18,6 +18,11 @@ def index():
     return FileResponse("service/app/static/index.html")
 
 
+@app.get("/privacy")
+async def privacy():
+    return FileResponse("service/app/static/privacy.html")
+
+
 @app.post("/api/detect", response_model=DetectResponse)
 def detect_from_base64(payload: DetectRequest):
     """

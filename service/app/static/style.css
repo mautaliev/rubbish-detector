@@ -96,3 +96,43 @@ button:disabled {
 .result ul { margin: 8px 0 0; }
 .error { color: #b42318; }
 .success { color: #067647; }
+
+body {
+    font-family: Arial, sans-serif;
+    max-width: 900px;
+    margin: 40px auto;
+    padding: 20px;
+    line-height: 1.7;
+    color: #222;
+}
+
+h1, h2 {
+    color: #111;
+}
+
+a {
+    color: #2563eb;
+}
+
+.container {
+    background: #ffffff;
+    border-radius: 12px;
+}
+
+.page-links {
+    margin-top: 28px;
+    padding-top: 18px;
+    border-top: 1px solid #e5e7eb;
+    text-align: center;
+}
+
+.page-links a {
+    color: #64748b;
+    font-size: 14px;
+    text-decoration: none;
+}
+
+.page-links a:hover {
+    color: #0f766e;
+    text-decoration: underline;
+}
