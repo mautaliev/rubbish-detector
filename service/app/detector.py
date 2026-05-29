@@ -110,12 +110,14 @@ def _draw_box(draw: ImageDraw.ImageDraw, box, label: str) -> None:
         label: Текст подписи (название класса и уверенность модели).
     """
     x1, y1, x2, y2 = [int(v) for v in box]
-    width = max(2, round((x2 - x1 + y2 - y1) / 250)) * 3
+    box_h = y2 - y1
+    width = max(1, round((x2 - x1 + box_h) / 400))
+    font_size = max(12, min(22, int(box_h * 0.12)))
 
     draw.rectangle((x1, y1, x2, y2), outline="red", width=width)
 
     try:
-        font = ImageFont.truetype("DejaVuSans.ttf", size=max(14, width * 7))
+        font = ImageFont.truetype("DejaVuSans.ttf", size=font_size)
     except Exception:
         font = ImageFont.load_default()
 
