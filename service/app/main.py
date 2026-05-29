@@ -13,6 +13,16 @@ app.mount("/static", StaticFiles(directory="service/app/static"), name="static")
 LOG_PATH = "requests.log.txt"
 
 
+def get_client_ip(request: Request) -> str:
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    real_ip = request.headers.get("X-Real-IP")
+    if real_ip:
+        return real_ip.strip()
+    return request.client.host
+
+
 def write_log(ip: str, path: str, body: str) -> None:
     """Записывает строку запроса в лог-файл.
 
@@ -53,7 +63,7 @@ def detect_from_base64(payload: DetectRequest, request: Request):
     """
     image_size = len(payload.image_base64.encode())
     write_log(
-        ip=request.client.host,
+        ip=get_client_ip(request),
         path="/api/detect",
         body=f"image=[base64, {image_size} bytes] detect_class={payload.detect_class} conf={payload.conf}",
     )
@@ -94,7 +104,7 @@ async def detect_from_file(
     try:
         data = await file.read()
         write_log(
-            ip=request.client.host,
+            ip=get_client_ip(request),
             path="/api/detect-file",
             body=f"file=[{file.filename}, {len(data)} bytes] detect_class={detect_class} conf={conf}",
         )
