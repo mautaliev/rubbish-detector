@@ -8,8 +8,8 @@ from PIL import Image, ImageDraw, ImageFont
 from ultralytics import YOLO
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
-MODEL_1C_PATH = ROOT_DIR / "rubbish-detector-1c.pt"
-MODEL_5C_PATH = ROOT_DIR / "rubbish-detector-5c.pt"
+MODEL_1C_PATH = ROOT_DIR / "models" / "rubbish-detector-1c.pt"
+MODEL_5C_PATH = ROOT_DIR / "models" / "rubbish-detector-5c.pt"
 
 _model_1c: Optional[YOLO] = None
 _model_5c: Optional[YOLO] = None

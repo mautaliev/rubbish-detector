@@ -2,4 +2,4 @@
 .venv/
 LST+TACO+Tyumen-1/
 runs/
-api_keys.json
+training/api_keys.json

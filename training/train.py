@@ -1,7 +1,6 @@
 import json
 import os
 import platform
-from pathlib import Path
 
 import torch
 from ultralytics import YOLO
@@ -15,7 +14,7 @@ def is_colab() -> bool:
     Returns:
         bool: True если среда Google Colab, иначе False.
     """
-    return "COLAB_GPU" in os.environ or Path("/content").exists()
+    return "COLAB_GPU" in os.environ or os.path.exists("/content")
 
 
 def get_device():
