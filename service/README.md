@@ -16,23 +16,46 @@ rubbish-detector-5c.pt
 
 ## Запуск
 
-Из корня репозитория:
+### С Docker (рекомендуется)
+
+```bash
+cp .env.example .env      # вписать DB_PASSWORD
+docker-compose up -d      # поднять app + db
+docker-compose exec app alembic upgrade head  # применить миграции
+```
+
+Веб-страница: `http://localhost:8000`  
+Swagger: `http://localhost:8000/docs`
+
+### Без Docker (только сервис, без БД)
 
 ```bash
 pip install -r requirements.txt
 uvicorn service.app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Веб-страница будет доступна по адресу:
+## База данных
 
-```text
-http://localhost:8000/
+Схема хранится в `service/db/`, миграции — в `service/db/alembic/`.
+
+| Таблица | Описание |
+|---|---|
+| `company` | Управляющие компании (УК) |
+| `cleaner` | Дворники, привязанные к УК |
+| `report` | Отчёты детекции с результатами по каждому фото |
+
+Добавить новую миграцию:
+
+```bash
+alembic revision -m "описание изменения"
+# отредактировать созданный файл в service/db/alembic/versions/
+alembic upgrade head
 ```
 
-Swagger-документация API:
+Откатить последнюю миграцию:
 
-```text
-http://localhost:8000/docs
+```bash
+alembic downgrade -1
 ```
 
 ## JSON API
