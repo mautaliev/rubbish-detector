@@ -79,7 +79,7 @@ def upgrade() -> None:
             postgresql.ENUM("single_class", "multi_class", name="model_version", create_type=False),
             nullable=False,
         ),
-        sa.Column("photos", postgresql.JSONB(), nullable=False, server_default="'[]'"),
+        sa.Column("photos", postgresql.JSONB(), nullable=False, server_default=sa.text("'[]'")),
         sa.Column("is_clean", sa.Boolean(), nullable=False),
         sa.Column("photos_count", sa.Integer(), nullable=False),
         sa.Column("objects_count", sa.Integer(), nullable=False),

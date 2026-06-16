@@ -6,9 +6,11 @@ from fastapi.staticfiles import StaticFiles
 
 from .detector import decode_image, detect, encode_image
 from .schemas import DetectRequest, DetectResponse
+from .db_router import router as db_router
 
 app = FastAPI(title="Rubbish Detector API", version="1.0.0")
 app.mount("/static", StaticFiles(directory="service/app/static"), name="static")
+app.include_router(db_router)
 
 LOG_PATH = "requests.log.txt"
 
@@ -122,6 +124,11 @@ async def detect_from_file(
         }
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/testlab")
+def testlab():
+    return FileResponse("service/app/static/testlab.html")
 
 
 def encode_bytes_to_base64(data: bytes) -> str:

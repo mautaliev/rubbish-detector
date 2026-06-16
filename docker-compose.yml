@@ -6,7 +6,7 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://rubbish:${DB_PASSWORD}@db:5432/rubbish
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:5432/${DB_NAME}
     ports:
       - "8000:8000"
 
@@ -14,13 +14,15 @@ services:
     image: postgres:16
     restart: unless-stopped
     environment:
-      POSTGRES_DB: rubbish
-      POSTGRES_USER: rubbish
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${DB_PORT}:5432"
     volumes:
       - ./pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U rubbish -d rubbish"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 5s
       timeout: 5s
       retries: 10

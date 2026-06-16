@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Test Lab — Rubbish Detector</title>
+  <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Arial, sans-serif; background: #f4f6f8; color: #17202a; }
+    .page { min-height: 100vh; padding: 32px 16px; max-width: 1100px; margin: 0 auto; }
+    h1 { margin: 0 0 4px; font-size: 22px; }
+    .subtitle { color: #667085; margin: 0 0 28px; font-size: 14px; }
+    .back { display: inline-block; margin-bottom: 20px; padding: 8px 14px; border: 1px solid #d0d5dd; border-radius: 10px; background: #fff; color: #344054; font-size: 13px; font-weight: 700; text-decoration: none; }
+    .back:hover { background: #f2f4f7; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+    .panel { background: #fff; border-radius: 16px; padding: 22px; box-shadow: 0 4px 16px rgba(0,0,0,0.07); }
+    .panel h2 { margin: 0 0 16px; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+    .badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px; letter-spacing: 0.04em; }
+    .badge-post { background: #dcfce7; color: #15803d; }
+    .badge-get { background: #dbeafe; color: #1d4ed8; }
+    label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; color: #344054; }
+    input, select { width: 100%; padding: 9px 12px; border: 1px solid #d0d5dd; border-radius: 10px; font-size: 14px; margin-bottom: 12px; background: #fff; color: #17202a; }
+    input:focus, select:focus { outline: none; border-color: #1d4ed8; }
+    .btn { border: none; background: #1d4ed8; color: white; border-radius: 10px; padding: 10px 20px; font-weight: 700; cursor: pointer; font-size: 14px; width: 100%; }
+    .btn:hover { background: #1e40af; }
+    .btn-secondary { background: #f2f4f7; color: #344054; border: 1px solid #d0d5dd; }
+    .btn-secondary:hover { background: #e5e7eb; }
+    .response { margin-top: 14px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; font-size: 12px; font-family: monospace; max-height: 220px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
+    .response.ok { border-color: #6ee7b7; background: #f0fdf4; color: #065f46; }
+    .response.err { border-color: #fca5a5; background: #fef2f2; color: #991b1b; }
+    .table-wrap { overflow-x: auto; margin-top: 14px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th { text-align: left; padding: 6px 10px; background: #f2f4f7; color: #344054; font-weight: 700; border-bottom: 1px solid #e5e7eb; }
+    td { padding: 6px 10px; border-bottom: 1px solid #f2f4f7; vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    .empty { color: #667085; font-size: 13px; text-align: center; padding: 16px; }
+    .full-width { grid-column: 1 / -1; }
+    .row-btns { display: flex; gap: 8px; }
+    .row-btns .btn { flex: 1; }
+    .chip { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+    .chip-clean { background: #dcfce7; color: #15803d; }
+    .chip-dirty { background: #fee2e2; color: #991b1b; }
+  </style>
+</head>
+<body>
+<div class="page">
+  <a href="/" class="back">← Главная</a>
+  <h1>Test Lab</h1>
+  <p class="subtitle">Тестовая страница для генерации данных в БД</p>
+
+  <div class="grid">
+
+    <!-- Создать компанию -->
+    <div class="panel">
+      <h2><span class="badge badge-post">POST</span> Создать компанию</h2>
+      <label>Название УК</label>
+      <input id="c-name" placeholder="ООО Чистый город" />
+      <label>VK ID контроллера</label>
+      <input id="c-vk" type="number" placeholder="123456789" />
+      <label>Invite code</label>
+      <input id="c-invite" placeholder="CLEAN2024" />
+      <label>Модель по умолчанию</label>
+      <select id="c-model">
+        <option value="single_class">single_class</option>
+        <option value="multi_class">multi_class</option>
+      </select>
+      <button class="btn" onclick="createCompany()">Создать</button>
+      <div id="c-resp" class="response" style="display:none"></div>
+    </div>
+
+    <!-- Создать дворника -->
+    <div class="panel">
+      <h2><span class="badge badge-post">POST</span> Зарегистрировать дворника</h2>
+      <label>VK ID дворника</label>
+      <input id="cl-vk" type="number" placeholder="987654321" />
+      <label>Полное имя</label>
+      <input id="cl-name" placeholder="Иванов Иван Иванович" />
+      <label>ID компании (company_id)</label>
+      <input id="cl-company" type="number" placeholder="1" />
+      <button class="btn" onclick="registerCleaner()">Зарегистрировать</button>
+      <div id="cl-resp" class="response" style="display:none"></div>
+    </div>
+
+    <!-- Создать отчёт -->
+    <div class="panel full-width">
+      <h2><span class="badge badge-post">POST</span> Создать отчёт</h2>
+      <div class="grid" style="gap:12px">
+        <div>
+          <label>cleaner_id</label>
+          <input id="r-cleaner" type="number" placeholder="1" />
+          <label>company_id</label>
+          <input id="r-company" type="number" placeholder="1" />
+          <label>Версия модели</label>
+          <select id="r-model">
+            <option value="single_class">single_class</option>
+            <option value="multi_class">multi_class</option>
+          </select>
+          <label>Комментарий (необязательно)</label>
+          <input id="r-comment" placeholder="Двор убран" />
+        </div>
+        <div>
+          <label>Фото (JSON-массив PhotoResult)</label>
+          <textarea id="r-photos" rows="10" style="width:100%;padding:9px 12px;border:1px solid #d0d5dd;border-radius:10px;font-size:12px;font-family:monospace;resize:vertical;color:#17202a">[
+  {
+    "original_key": "s3/orig/photo1.jpg",
+    "detected_key": "s3/det/photo1.jpg",
+    "total_objects": 3,
+    "classes": {"plastic": 2, "paper": 1},
+    "is_clean": false
+  }
+]</textarea>
+        </div>
+      </div>
+      <button class="btn" style="margin-top:12px" onclick="createReport()">Создать отчёт</button>
+      <div id="r-resp" class="response" style="display:none"></div>
+    </div>
+
+    <!-- Список компаний -->
+    <div class="panel">
+      <h2><span class="badge badge-get">GET</span> Компании</h2>
+      <button class="btn btn-secondary" onclick="loadCompanies()">Загрузить</button>
+      <div class="table-wrap">
+        <table id="companies-table">
+          <thead><tr><th>ID</th><th>Название</th><th>VK ID</th><th>Invite</th><th>Модель</th></tr></thead>
+          <tbody><tr><td colspan="5" class="empty">Нажмите «Загрузить»</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Список дворников -->
+    <div class="panel">
+      <h2><span class="badge badge-get">GET</span> Дворники</h2>
+      <button class="btn btn-secondary" onclick="loadCleaners()">Загрузить</button>
+      <div class="table-wrap">
+        <table id="cleaners-table">
+          <thead><tr><th>ID</th><th>Имя</th><th>VK ID</th><th>УК</th></tr></thead>
+          <tbody><tr><td colspan="4" class="empty">Нажмите «Загрузить»</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Список отчётов -->
+    <div class="panel full-width">
+      <h2><span class="badge badge-get">GET</span> Отчёты</h2>
+      <div class="row-btns" style="margin-bottom:10px">
+        <input id="filter-company" type="number" placeholder="company_id (необяз.)" style="margin-bottom:0" />
+        <input id="filter-cleaner" type="number" placeholder="cleaner_id (необяз.)" style="margin-bottom:0" />
+        <button class="btn btn-secondary" onclick="loadReports()">Загрузить</button>
+      </div>
+      <div class="table-wrap">
+        <table id="reports-table">
+          <thead><tr><th>ID</th><th>Дворник</th><th>УК</th><th>Статус</th><th>Фото</th><th>Объектов</th><th>Модель</th><th>Создан</th><th></th></tr></thead>
+          <tbody><tr><td colspan="9" class="empty">Нажмите «Загрузить»</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  function showResp(id, data, ok) {
+    const el = document.getElementById(id);
+    el.style.display = 'block';
+    el.className = 'response ' + (ok ? 'ok' : 'err');
+    el.textContent = JSON.stringify(data, null, 2);
+  }
+
+  async function createCompany() {
+    const body = {
+      name: document.getElementById('c-name').value,
+      vk_user_id: parseInt(document.getElementById('c-vk').value),
+      invite_code: document.getElementById('c-invite').value,
+      default_model: document.getElementById('c-model').value,
+    };
+    const r = await fetch('/api/db/companies', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    showResp('c-resp', await r.json(), r.ok);
+  }
+
+  async function registerCleaner() {
+    const fd = new FormData();
+    fd.append('vk_user_id', document.getElementById('cl-vk').value);
+    fd.append('full_name', document.getElementById('cl-name').value);
+    fd.append('company_id', document.getElementById('cl-company').value);
+    const r = await fetch('/api/db/cleaners', { method: 'POST', body: fd });
+    showResp('cl-resp', await r.json(), r.ok);
+  }
+
+  async function createReport() {
+    let photos;
+    try { photos = JSON.parse(document.getElementById('r-photos').value); }
+    catch { showResp('r-resp', { error: 'Невалидный JSON в поле Фото' }, false); return; }
+    const body = {
+      cleaner_id: parseInt(document.getElementById('r-cleaner').value),
+      company_id: parseInt(document.getElementById('r-company').value),
+      model_version: document.getElementById('r-model').value,
+      comment: document.getElementById('r-comment').value || null,
+      photos,
+    };
+    const r = await fetch('/api/db/reports', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    showResp('r-resp', await r.json(), r.ok);
+  }
+
+  async function loadCompanies() {
+    const r = await fetch('/api/db/companies');
+    const data = await r.json();
+    const tbody = document.querySelector('#companies-table tbody');
+    if (!data.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">Нет данных</td></tr>'; return; }
+    tbody.innerHTML = data.map(c => `<tr>
+      <td>${c.id}</td>
+      <td>${esc(c.name)}</td>
+      <td>${c.vk_user_id}</td>
+      <td><code>${esc(c.invite_code)}</code></td>
+      <td>${c.default_model}</td>
+    </tr>`).join('');
+  }
+
+  async function loadCleaners() {
+    const r = await fetch('/api/db/cleaners');
+    const data = await r.json();
+    const tbody = document.querySelector('#cleaners-table tbody');
+    if (!data.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty">Нет данных</td></tr>'; return; }
+    tbody.innerHTML = data.map(c => `<tr>
+      <td>${c.id}</td>
+      <td>${esc(c.full_name)}</td>
+      <td>${c.vk_user_id}</td>
+      <td>${c.company_id}</td>
+    </tr>`).join('');
+  }
+
+  async function loadReports() {
+    const params = new URLSearchParams();
+    const co = document.getElementById('filter-company').value;
+    const cl = document.getElementById('filter-cleaner').value;
+    if (co) params.set('company_id', co);
+    if (cl) params.set('cleaner_id', cl);
+    const r = await fetch('/api/db/reports?' + params);
+    const data = await r.json();
+    const tbody = document.querySelector('#reports-table tbody');
+    if (!data.length) { tbody.innerHTML = '<tr><td colspan="9" class="empty">Нет данных</td></tr>'; return; }
+    tbody.innerHTML = data.map((rep, i) => `<tr>
+      <td style="font-size:11px;max-width:80px;overflow:hidden;text-overflow:ellipsis" title="${rep.id}">${rep.id.slice(0,8)}…</td>
+      <td>${rep.cleaner_id}</td>
+      <td>${rep.company_id}</td>
+      <td><span class="chip ${rep.is_clean ? 'chip-clean' : 'chip-dirty'}">${rep.is_clean ? 'Чисто' : 'Грязно'}</span></td>
+      <td>${rep.photos_count}</td>
+      <td>${rep.objects_count}</td>
+      <td>${rep.model_version}</td>
+      <td style="font-size:11px">${rep.created_at.replace('T',' ').slice(0,19)}</td>
+      <td><button class="btn btn-secondary" style="padding:4px 10px;font-size:11px;width:auto" onclick="togglePhotos('photos-${i}')">photos</button></td>
+    </tr><tr id="photos-${i}" style="display:none"><td colspan="9" style="padding:0">
+      <pre style="margin:0;padding:10px 14px;background:#f9fafb;border-top:1px solid #e5e7eb;font-size:11px;overflow-x:auto">${esc(JSON.stringify(rep.photos, null, 2))}</pre>
+    </td></tr>`).join('');
+  }
+
+  function togglePhotos(id) {
+    const row = document.getElementById(id);
+    row.style.display = row.style.display === 'none' ? '' : 'none';
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+</script>
+</body>
+</html>
