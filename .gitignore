@@ -4,3 +4,5 @@
 LST+TACO+Tyumen-1/
 runs/
 training/api_keys.json
+.env
+pgdata/
