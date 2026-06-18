@@ -1,12 +1,17 @@
+import base64
+import logging
 from datetime import datetime
 
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from .auth import require_local
+from .db_router import router as db_router
 from .detector import decode_image, detect, encode_image
 from .schemas import DetectRequest, DetectResponse
-from .db_router import router as db_router
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Rubbish Detector API", version="1.0.0")
 app.mount("/static", StaticFiles(directory="service/app/static"), name="static")
@@ -16,6 +21,14 @@ LOG_PATH = "requests.log.txt"
 
 
 def get_client_ip(request: Request) -> str:
+    """Возвращает реальный IP-адрес клиента с учётом заголовков прокси.
+
+    Args:
+        request: Объект HTTP-запроса FastAPI.
+
+    Returns:
+        str: IP-адрес отправителя запроса.
+    """
     forwarded_for = request.headers.get("X-Forwarded-For")
     if forwarded_for:
         return forwarded_for.split(",")[0].strip()
@@ -40,6 +53,18 @@ def write_log(ip: str, path: str, body: str) -> None:
         )
 
 
+def encode_bytes_to_base64(data: bytes) -> str:
+    """Кодирует байты в base64-строку.
+
+    Args:
+        data: Бинарные данные для кодирования.
+
+    Returns:
+        str: Данные в формате base64.
+    """
+    return base64.b64encode(data).decode("utf-8")
+
+
 @app.get("/")
 def index():
     """Возвращает главную HTML-страницу сервиса."""
@@ -50,6 +75,16 @@ def index():
 async def privacy():
     """Возвращает страницу политики конфиденциальности."""
     return FileResponse("service/app/static/privacy.html")
+
+
+@app.get("/testlab")
+def testlab(_: None = Depends(require_local)):
+    """Возвращает страницу Test Lab. Доступна только при TESTLAB_ENABLED=1.
+
+    Returns:
+        FileResponse: HTML-страница тестовой лаборатории.
+    """
+    return FileResponse("service/app/static/testlab.html")
 
 
 @app.post("/api/detect", response_model=DetectResponse)
@@ -82,7 +117,8 @@ def detect_from_base64(payload: DetectRequest, request: Request):
             "total": result["total"],
         }
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        logger.error("Detection error: %s", exc)
+        raise HTTPException(status_code=400, detail="Detection failed") from exc
 
 
 @app.post("/api/detect-file")
@@ -110,8 +146,7 @@ async def detect_from_file(
             path="/api/detect-file",
             body=f"file=[{file.filename}, {len(data)} bytes] detect_class={detect_class} conf={conf}",
         )
-        image_base64 = encode_bytes_to_base64(data)
-        image = decode_image(image_base64)
+        image = decode_image(encode_bytes_to_base64(data))
         result = detect(image, detect_class=detect_class, conf=conf)
 
         if result["image"] is None:
@@ -123,23 +158,5 @@ async def detect_from_file(
             "total": result["total"],
         }
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
-@app.get("/testlab")
-def testlab():
-    return FileResponse("service/app/static/testlab.html")
-
-
-def encode_bytes_to_base64(data: bytes) -> str:
-    """Кодирует байты в base64-строку.
-
-    Args:
-        data: Бинарные данные для кодирования.
-
-    Returns:
-        str: Данные в формате base64.
-    """
-    import base64
-
-    return base64.b64encode(data).decode("utf-8")
+        logger.error("Detection error: %s", exc)
+        raise HTTPException(status_code=400, detail="Detection failed") from exc
