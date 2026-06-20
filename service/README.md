@@ -19,13 +19,43 @@ rubbish-detector-5c.pt
 ### С Docker (рекомендуется)
 
 ```bash
-cp .env.example .env      # вписать DB_PASSWORD
-docker-compose up -d      # поднять app + db
+cp .env.example .env                          # вписать DB_PASSWORD
+docker-compose up -d --build                  # поднять app + db
 docker-compose exec app alembic upgrade head  # применить миграции
 ```
 
 Веб-страница: `http://localhost:8000`  
 Swagger: `http://localhost:8000/docs`
+
+### Остановка Docker-контейнеров
+
+```bash
+docker-compose down          # остановить и удалить контейнеры
+docker-compose down -v       # также удалить volumes (данные БД будут потеряны)
+```
+
+### Пересборка контейнеров после изменений в коде
+
+Простой `docker-compose up -d` поднимает закэшированный образ — код не обновляется.
+
+```bash
+docker-compose down
+docker-compose up -d --build          # пересобрать образ и запустить
+```
+
+Если изменения всё равно не применяются:
+
+```bash
+docker-compose build --no-cache       # полная пересборка без кэша
+docker-compose up -d
+```
+
+> **Важно:** если вы запускаете сервис локально через `uvicorn` без Docker, пересборка контейнеров не имеет эффекта. Убедитесь, что нужные переменные окружения заданы в shell:
+>
+> ```bash
+> echo $ENVIRONMENT
+> echo $TESTLAB_ENABLED
+> ```
 
 ### Без Docker (только сервис, без БД)
 
