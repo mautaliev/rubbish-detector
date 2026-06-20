@@ -26,12 +26,20 @@ def _client():
 
 
 def _prefix(company_id: int | None) -> str:
-    """Возвращает префикс S3-ключа: id компании или 'unauthorized'."""
+    """Возвращает префикс S3-ключа: id компании или 'unauthorized'.
+
+    Args:
+        company_id: id управляющей компании или None для неавторизованного запроса.
+    """
     return str(company_id) if company_id is not None else "unauthorized"
 
 
 def _to_jpeg(img: Image.Image) -> bytes:
-    """Кодирует PIL-изображение в JPEG с качеством 92."""
+    """Кодирует PIL-изображение в JPEG с качеством 92.
+
+    Args:
+        img: PIL-изображение для кодирования.
+    """
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=92)
     return buf.getvalue()
@@ -43,7 +51,14 @@ async def save_pair(
     detected: bytes,
     ext: str = "jpg",
 ) -> dict:
-    """Сохраняет пару original/detected в S3. Возвращает file_id и S3-ключи."""
+    """Сохраняет пару original/detected в S3. Возвращает file_id и S3-ключи.
+
+    Args:
+        company_id: id управляющей компании или None для неавторизованного запроса.
+        original: байты исходного изображения.
+        detected: байты размеченного изображения.
+        ext: расширение файла (по умолчанию 'jpg').
+    """
     prefix = _prefix(company_id)
     day = datetime.date.today().isoformat()
     file_id = uuid.uuid4().hex
@@ -63,7 +78,12 @@ async def save_pair(
 
 
 async def get_presigned_url(key: str, expires: int = 3600) -> str:
-    """Возвращает presigned URL на объект, действительный `expires` секунд."""
+    """Возвращает presigned URL на объект, действительный `expires` секунд.
+
+    Args:
+        key: S3-ключ объекта (например, '100/detected/2026-06-20/3f9ac1d2.jpg').
+        expires: срок жизни ссылки в секундах (по умолчанию 3600 — 1 час).
+    """
     async with _client() as s3:
         return await s3.generate_presigned_url(
             "get_object",
