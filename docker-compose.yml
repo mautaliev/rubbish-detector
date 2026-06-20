@@ -7,7 +7,8 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:5432/${DB_NAME}
-      ENVIRONMENT: production
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      TESTLAB_ENABLED: ${TESTLAB_ENABLED:-}
     ports:
       - "8000:8000"
 
