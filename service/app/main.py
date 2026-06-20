@@ -1,5 +1,8 @@
+import asyncio
 import base64
 import logging
+import os
+from contextlib import asynccontextmanager
 from datetime import datetime
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -13,7 +16,36 @@ from .schemas import DetectRequest, DetectResponse
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Rubbish Detector API", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Запускает Long Poll VK-бота как фоновую задачу при старте приложения.
+
+    Бот запускается только если задана переменная окружения VK_TOKEN.
+    При остановке приложения задача отменяется.
+    """
+    task = None
+    if os.environ.get("VK_TOKEN"):
+        try:
+            from .bot.longpoll import create_bot
+            bot = create_bot()
+            task = asyncio.create_task(bot.run_polling())
+            logger.info("VK Long Poll started")
+        except Exception:
+            logger.error("Failed to start VK bot", exc_info=True)
+    else:
+        logger.warning("VK_TOKEN not set — VK bot disabled")
+    yield
+    if task is not None:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        logger.info("VK Long Poll stopped")
+
+
+app = FastAPI(title="Rubbish Detector API", version="1.0.0", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="service/app/static"), name="static")
 app.include_router(db_router)
 

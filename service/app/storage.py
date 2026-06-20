@@ -77,6 +77,21 @@ async def save_pair(
     return {"id": file_id, "keys": keys}
 
 
+async def download(key: str) -> bytes:
+    """Скачивает объект из S3 по ключу и возвращает его содержимое.
+
+    Args:
+        key: S3-ключ объекта (например, '100/original/2026-06-20/3f9ac1d2.jpg').
+
+    Returns:
+        bytes: Содержимое объекта.
+    """
+    bucket = os.environ["S3_BUCKET"]
+    async with _client() as s3:
+        response = await s3.get_object(Bucket=bucket, Key=key)
+        return await response["Body"].read()
+
+
 async def get_presigned_url(key: str, expires: int = 3600) -> str:
     """Возвращает presigned URL на объект, действительный `expires` секунд.
 

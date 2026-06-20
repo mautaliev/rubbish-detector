@@ -23,6 +23,8 @@ class CompanyCreate(BaseModel):
     vk_user_id: int  # VK-ID контроллера для уведомлений
     invite_code: str  # уникальный код регистрации дворников
     default_model: ModelVersion = ModelVersion.single_class
+    phone: str | None = None
+    status: int = 1  # 0=active, 1=pending, 2=denied
 
 
 class CompanyRead(BaseModel):
@@ -33,6 +35,8 @@ class CompanyRead(BaseModel):
     vk_user_id: int
     invite_code: str
     default_model: ModelVersion
+    phone: str | None
+    status: int  # 0=active, 1=pending, 2=denied
     created_at: datetime
 
     model_config = {"from_attributes": True}

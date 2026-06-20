@@ -40,3 +40,12 @@ def get_by_vk_id(db: Session, vk_user_id: int) -> CleanerRead | None:
     """
     cleaner = db.query(Cleaner).filter(Cleaner.vk_user_id == vk_user_id).first()
     return CleanerRead.model_validate(cleaner) if cleaner else None
+
+
+def list_all_vk_ids(db: Session) -> list[int]:
+    """Возвращает список VK-ID всех зарегистрированных дворников.
+
+    Используется для рассылки уведомлений всем пользователям системы.
+    """
+    rows = db.query(Cleaner.vk_user_id).all()
+    return [r[0] for r in rows]

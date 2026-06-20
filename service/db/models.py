@@ -9,6 +9,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    SmallInteger,
     Text,
     func,
 )
@@ -49,6 +50,8 @@ class Company(Base):
         nullable=False,
         default=ModelVersion.single_class,
     )  # модель по умолчанию для новых отчётов этой УК
+    phone = Column(Text, nullable=True)  # контактный телефон УК
+    status = Column(SmallInteger, nullable=False, server_default="1")  # 0=active, 1=pending, 2=denied
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=func.now())
 
     cleaners = relationship("Cleaner", back_populates="company")

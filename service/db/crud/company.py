@@ -29,3 +29,51 @@ def get_by_invite_code(db: Session, invite_code: str) -> CompanyRead | None:
     """
     company = db.query(Company).filter(Company.invite_code == invite_code).first()
     return CompanyRead.model_validate(company) if company else None
+
+
+def get_by_vk_id(db: Session, vk_user_id: int) -> CompanyRead | None:
+    """Возвращает УК по VK-ID её контроллера или None, если не найдена.
+
+    Используется ботом для маршрутизации: если отправитель — контроллер,
+    его vk_user_id хранится в company.vk_user_id.
+    """
+    company = db.query(Company).filter(Company.vk_user_id == vk_user_id).first()
+    return CompanyRead.model_validate(company) if company else None
+
+
+def set_status(db: Session, company_id: int, status: int) -> CompanyRead | None:
+    """Устанавливает статус УК (0=active, 1=pending, 2=denied).
+
+    Вызывается администратором при одобрении или отклонении заявки.
+    Возвращает обновлённую запись или None, если УК не найдена.
+    """
+    company = db.get(Company, company_id)
+    if company is None:
+        return None
+    company.status = status
+    db.commit()
+    db.refresh(company)
+    return CompanyRead.model_validate(company)
+
+
+def list_pending(db: Session) -> list[CompanyRead]:
+    """Возвращает все УК со статусом pending (1), отсортированные по дате создания.
+
+    Используется администратором для просмотра очереди заявок на регистрацию.
+    """
+    companies = (
+        db.query(Company)
+        .filter(Company.status == 1)
+        .order_by(Company.created_at)
+        .all()
+    )
+    return [CompanyRead.model_validate(c) for c in companies]
+
+
+def list_active_vk_ids(db: Session) -> list[int]:
+    """Возвращает список VK-ID контроллеров всех активных УК.
+
+    Используется для рассылки уведомлений всем пользователям системы.
+    """
+    rows = db.query(Company.vk_user_id).filter(Company.status == 0).all()
+    return [r[0] for r in rows]
