@@ -64,6 +64,52 @@ pip install -r requirements.txt
 uvicorn service.app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
+## S3-хранилище
+
+Сервис сохраняет исходные изображения и результаты детекции в S3-совместимом объектном хранилище.
+
+### Локальная разработка (MinIO)
+
+`docker-compose.yml` уже содержит сервис `minio`. Он запускается вместе с остальными контейнерами:
+
+```bash
+docker-compose up -d
+```
+
+- S3 API: `http://localhost:9000`
+- Веб-консоль: `http://localhost:9001` (логин/пароль: `minioadmin` / `minioadmin`)
+
+После запуска создайте bucket `rubbish-detector` через веб-консоль или через `mc`.
+
+Переменные окружения (`.env`):
+
+```env
+S3_ENDPOINT_URL=http://localhost:9000
+S3_ACCESS_KEY=minioadmin
+S3_SECRET_KEY=minioadmin
+S3_BUCKET=rubbish-detector
+S3_REGION=us-east-1
+```
+
+### Продакшен (Selectel Object Storage)
+
+1. В панели Selectel перейти в **Облачная платформа → Объектное хранилище**.
+2. Создать приватный контейнер `rubbish-detector` в регионе на территории РФ.
+3. Создать сервисного пользователя и сгенерировать пару ключей S3 Access Key / Secret Key.
+4. Endpoint указан в панели управления контейнером (вида `https://s3.<регион>.storage.selcloud.ru`).
+
+Переменные окружения для продакшена:
+
+```env
+S3_ENDPOINT_URL=https://s3.ru-1.storage.selcloud.ru   # уточнить в панели
+S3_ACCESS_KEY=<выданный_access_key>
+S3_SECRET_KEY=<выданный_secret_key>
+S3_BUCKET=rubbish-detector
+S3_REGION=ru-1
+```
+
+Настройте lifecycle-правило на автоудаление объектов в соответствии с принятым сроком хранения.
+
 ## База данных
 
 Схема хранится в `service/db/`, миграции — в `service/db/alembic/`.
