@@ -1,5 +1,7 @@
 """CRUD-операции для управляющих компаний (УК)."""
 
+from datetime import datetime
+
 from sqlalchemy.orm import Session
 
 from ..models import Company
@@ -77,3 +79,22 @@ def list_active_vk_ids(db: Session) -> list[int]:
     """
     rows = db.query(Company.vk_user_id).filter(Company.status == 0).all()
     return [r[0] for r in rows]
+
+
+def count_total_active(db: Session) -> int:
+    """Возвращает общее количество активных УК (status=0).
+
+    Args:
+        db: Сессия SQLAlchemy.
+    """
+    return db.query(Company).filter(Company.status == 0).count()
+
+
+def count_new_since(db: Session, since: datetime) -> int:
+    """Возвращает количество УК, созданных с момента since (все статусы).
+
+    Args:
+        db: Сессия SQLAlchemy.
+        since: Начало периода (UTC).
+    """
+    return db.query(Company).filter(Company.created_at >= since).count()

@@ -1,5 +1,7 @@
 """CRUD-операции для дворников."""
 
+from datetime import datetime
+
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -49,3 +51,22 @@ def list_all_vk_ids(db: Session) -> list[int]:
     """
     rows = db.query(Cleaner.vk_user_id).all()
     return [r[0] for r in rows]
+
+
+def count_total(db: Session) -> int:
+    """Возвращает общее количество зарегистрированных дворников.
+
+    Args:
+        db: Сессия SQLAlchemy.
+    """
+    return db.query(Cleaner).count()
+
+
+def count_new_since(db: Session, since: datetime) -> int:
+    """Возвращает количество дворников, зарегистрированных с момента since.
+
+    Args:
+        db: Сессия SQLAlchemy.
+        since: Начало периода (UTC).
+    """
+    return db.query(Cleaner).filter(Cleaner.created_at >= since).count()

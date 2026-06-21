@@ -3,6 +3,7 @@
 import uuid
 from datetime import datetime, timezone
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..models import Report
@@ -96,3 +97,25 @@ def get_by_id(db: Session, report_id: uuid.UUID) -> ReportRead | None:
     """Возвращает отчёт по UUID или None, если не найден."""
     report = db.get(Report, report_id)
     return ReportRead.model_validate(report) if report else None
+
+
+def get_stats_for_period(db: Session, since: datetime) -> tuple[int, int, int]:
+    """Возвращает (кол-во отчётов, кол-во фото, кол-во объектов мусора) за период с since.
+
+    Args:
+        db: Сессия SQLAlchemy.
+        since: Начало периода (UTC).
+
+    Returns:
+        tuple: (reports_count, photos_count, objects_count).
+    """
+    row = (
+        db.query(
+            func.count(Report.id),
+            func.coalesce(func.sum(Report.photos_count), 0),
+            func.coalesce(func.sum(Report.objects_count), 0),
+        )
+        .filter(Report.created_at >= since)
+        .one()
+    )
+    return int(row[0]), int(row[1]), int(row[2])

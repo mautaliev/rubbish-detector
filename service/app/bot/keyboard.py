@@ -38,6 +38,8 @@ def admin_keyboard() -> str:
     kb = Keyboard(one_time=True)
     kb.add(Text("Заявки на регистрацию"), color=KeyboardButtonColor.PRIMARY)
     kb.add(Text("Рассылка уведомления"), color=KeyboardButtonColor.SECONDARY)
+    kb.row()
+    kb.add(Text("Статистика"), color=KeyboardButtonColor.SECONDARY)
     return kb.get_json()
 
 

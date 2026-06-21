@@ -6,6 +6,7 @@ import logging
 import os
 import random
 import string
+from datetime import datetime, timedelta, timezone
 
 from vkbottle.bot import BotLabeler, Message
 
@@ -125,6 +126,44 @@ def _db_mark_notified(report_id) -> None:
     """Синхронная простановка notified_at в отчёте."""
     with SessionLocal() as db:
         crud_report.mark_notified(db, report_id)
+
+
+def _db_get_statistics() -> dict:
+    """Синхронный сбор статистики системы за три временных интервала.
+
+    Returns:
+        dict: Словарь со всеми показателями для формирования сообщения.
+    """
+    now = datetime.now(tz=timezone.utc)
+    since_24h = now - timedelta(hours=24)
+    since_7d = now - timedelta(days=7)
+    since_30d = now - timedelta(days=30)
+
+    with SessionLocal() as db:
+        total_companies = crud_company.count_total_active(db)
+        total_cleaners = crud_cleaner.count_total(db)
+
+        new_companies_24h = crud_company.count_new_since(db, since_24h)
+        new_companies_7d = crud_company.count_new_since(db, since_7d)
+        new_companies_30d = crud_company.count_new_since(db, since_30d)
+
+        new_cleaners_24h = crud_cleaner.count_new_since(db, since_24h)
+        new_cleaners_7d = crud_cleaner.count_new_since(db, since_7d)
+        new_cleaners_30d = crud_cleaner.count_new_since(db, since_30d)
+
+        r24h, p24h, o24h = crud_report.get_stats_for_period(db, since_24h)
+        r7d, p7d, o7d = crud_report.get_stats_for_period(db, since_7d)
+        r30d, p30d, o30d = crud_report.get_stats_for_period(db, since_30d)
+
+    return {
+        "total_companies": total_companies,
+        "total_cleaners": total_cleaners,
+        "new_companies": (new_companies_24h, new_companies_7d, new_companies_30d),
+        "new_cleaners": (new_cleaners_24h, new_cleaners_7d, new_cleaners_30d),
+        "reports": (r24h, r7d, r30d),
+        "photos": (p24h, p7d, p30d),
+        "objects": (o24h, o7d, o30d),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -643,9 +682,46 @@ async def _handle_admin(message: Message, session: dict) -> None:
             keyboard=empty_keyboard(),
         )
         return
+    if text == "Статистика":
+        await _admin_show_statistics(api, vk_user_id)
+        return
 
     # Любое другое сообщение → главная панель
     await send_message(api, vk_user_id, "Панель администратора.", keyboard=admin_keyboard())
+
+
+async def _admin_show_statistics(api, vk_user_id: int) -> None:
+    """Собирает и отправляет администратору статистику использования приложения.
+
+    Данные формируются за три периода: последние 24 часа, 7 дней и 30 дней.
+    Всё отправляется одним сообщением.
+
+    Args:
+        api: VK API.
+        vk_user_id: VK-ID администратора.
+    """
+    stats = await asyncio.to_thread(_db_get_statistics)
+
+    nc = stats["new_companies"]
+    nw = stats["new_cleaners"]
+    r = stats["reports"]
+    p = stats["photos"]
+    o = stats["objects"]
+
+    text = (
+        "📊 Статистика системы\n\n"
+        f"🏢 Управляющих компаний (активных): {stats['total_companies']}\n"
+        f"👷 Дворников: {stats['total_cleaners']}\n\n"
+        "Новые регистрации:\n"
+        f"📅 За 24 часа — УК: {nc[0]}, дворников: {nw[0]}\n"
+        f"📅 За 7 дней — УК: {nc[1]}, дворников: {nw[1]}\n"
+        f"📅 За 30 дней — УК: {nc[2]}, дворников: {nw[2]}\n\n"
+        "Активность системы:\n"
+        f"⏱ За 24 часа — отчётов: {r[0]}, изображений: {p[0]}, объектов мусора: {o[0]}\n"
+        f"⏱ За 7 дней — отчётов: {r[1]}, изображений: {p[1]}, объектов мусора: {o[1]}\n"
+        f"⏱ За 30 дней — отчётов: {r[2]}, изображений: {p[2]}, объектов мусора: {o[2]}"
+    )
+    await send_message(api, vk_user_id, text, keyboard=admin_keyboard())
 
 
 async def _admin_show_pending(api, vk_user_id: int) -> None:
