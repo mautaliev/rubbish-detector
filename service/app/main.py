@@ -27,9 +27,15 @@ async def lifespan(app: FastAPI):
     task = None
     if os.environ.get("VK_TOKEN"):
         try:
-            from .bot.longpoll import create_bot
+            from .bot.longpoll import _diagnose_api, create_bot
+            await _diagnose_api(os.environ["VK_TOKEN"])
             bot = create_bot()
+            def _on_bot_done(t: asyncio.Task) -> None:
+                if not t.cancelled() and t.exception():
+                    logger.error("VK bot polling crashed: %s", t.exception(), exc_info=t.exception())
+
             task = asyncio.create_task(bot.run_polling())
+            task.add_done_callback(_on_bot_done)
             logger.info("VK Long Poll started")
         except Exception:
             logger.error("Failed to start VK bot", exc_info=True)

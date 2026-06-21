@@ -12,8 +12,8 @@ def role_keyboard() -> str:
         str: JSON-строка клавиатуры VK.
     """
     kb = Keyboard(one_time=True)
-    kb.add(Text("Управляющая компания"), color=KeyboardButtonColor.PRIMARY)
-    kb.add(Text("Сотрудник по уборке территории"), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Text("Упр. организация"), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Text("Сотрудник по уборке"), color=KeyboardButtonColor.PRIMARY)
     return kb.get_json()
 
 

@@ -179,11 +179,11 @@ async def main_handler(message: Message) -> None:
 
     # Не зарегистрирован — обрабатываем нажатия кнопок ролей или показываем приветствие
     text = (message.text or "").strip()
-    if text == "Управляющая компания":
+    if text == "Упр. организация":
         set_state(vk_user_id, DialogState.REG_COMPANY_NAME)
         await send_message(api, vk_user_id, "Введите название вашей управляющей компании.")
         return
-    if text == "Сотрудник по уборке территории":
+    if text == "Сотрудник по уборке":
         set_state(vk_user_id, DialogState.REG_CLEANER_CODE)
         await send_message(
             api,
@@ -691,7 +691,12 @@ async def _admin_process_decision(api, admin_vk_id: int, action: str, company_id
                 "в этот бот, после чего могут присылать фото-отчёты. Вы будете "
                 "получать уведомления о результатах проверки в этот чат.",
             )
-        await send_message(api, admin_vk_id, f"Компания #{company_id} одобрена.", keyboard=admin_keyboard())
+            await send_message(
+                api,
+                admin_vk_id,
+                f"✅ Заявка компании «{company.name}» принята.",
+            )
+        await _admin_show_pending(api, admin_vk_id)
     else:
         company = await asyncio.to_thread(_db_set_company_status, company_id, 2)
         if company:
@@ -701,7 +706,12 @@ async def _admin_process_decision(api, admin_vk_id: int, action: str, company_id
                 "К сожалению, ваша заявка на регистрацию отклонена. "
                 "Для уточнения деталей свяжитесь с администрацией сервиса.",
             )
-        await send_message(api, admin_vk_id, f"Компания #{company_id} отклонена.", keyboard=admin_keyboard())
+            await send_message(
+                api,
+                admin_vk_id,
+                f"❌ Заявка компании «{company.name}» отклонена.",
+            )
+        await _admin_show_pending(api, admin_vk_id)
 
 
 async def _admin_broadcast_text(message: Message, session: dict) -> None:
