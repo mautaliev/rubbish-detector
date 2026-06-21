@@ -6,3 +6,4 @@ runs/
 training/api_keys.json
 .env
 pgdata/
+minio-data/
