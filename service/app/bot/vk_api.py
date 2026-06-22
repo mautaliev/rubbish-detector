@@ -1,5 +1,6 @@
 """Обёртки над VK API: отправка сообщений и загрузка фотографий."""
 
+import json
 import logging
 
 import aiohttp
@@ -33,6 +34,44 @@ async def send_message(
     except Exception:
         logger.error("Failed to send message to user %d", user_id, exc_info=True)
         raise
+
+
+async def upload_doc_for_message(
+    api,
+    peer_id: int,
+    file_bytes: bytes,
+    file_name: str,
+    content_type: str = "application/octet-stream",
+) -> str:
+    """Загружает документ в VK как собственный файл бота для отправки в сообщении.
+
+    Args:
+        api: Объект VK API из vkbottle.
+        peer_id: peer_id диалога, для которого загружается документ.
+        file_bytes: Байты файла.
+        file_name: Имя файла с расширением (например, 'doc_12345.pdf').
+        content_type: MIME-тип файла.
+
+    Returns:
+        str: Строка вложения вида 'doc<owner_id>_<doc_id>'.
+    """
+    upload_server = await api.docs.get_messages_upload_server(peer_id=peer_id, type="doc")
+
+    async with aiohttp.ClientSession() as session:
+        form = aiohttp.FormData()
+        form.add_field("file", file_bytes, filename=file_name, content_type=content_type)
+        async with session.post(upload_server.upload_url, data=form) as resp:
+            raw = await resp.text()
+            try:
+                data = json.loads(raw)
+            except json.JSONDecodeError:
+                raise RuntimeError(
+                    f"VK doc upload server returned non-JSON (HTTP {resp.status}): {raw[:300]!r}"
+                )
+
+    saved = await api.docs.save(file=data["file"], title=file_name)
+    doc = saved.doc
+    return f"doc{doc.owner_id}_{doc.id}"
 
 
 async def upload_photo_for_message(api, peer_id: int, photo_bytes: bytes) -> str:
@@ -75,21 +114,36 @@ def build_attachment_str(attachments) -> str:
     Поддерживает photo, doc, video. Используется для пересылки формы ПД
     от заявителя-УК к администратору.
 
+    access_key включается в строку, когда он есть: без него VK API отклоняет
+    пересылку чужих документов между беседами.
+
     Args:
         attachments: Список объектов вложений из входящего VK-сообщения.
 
     Returns:
-        str: Строка вида 'photo123_456,doc789_012' для передачи в messages.send.
+        str: Строка вида 'photo123_456_key,doc789_012_key' для передачи в messages.send.
     """
     parts = []
     for att in attachments or []:
         att_type = att.type.value if hasattr(att.type, "value") else str(att.type)
         if att_type == "photo" and att.photo:
-            parts.append(f"photo{att.photo.owner_id}_{att.photo.id}")
+            s = f"photo{att.photo.owner_id}_{att.photo.id}"
+            key = getattr(att.photo, "access_key", None)
+            if key:
+                s += f"_{key}"
+            parts.append(s)
         elif att_type == "doc" and att.doc:
-            parts.append(f"doc{att.doc.owner_id}_{att.doc.id}")
+            s = f"doc{att.doc.owner_id}_{att.doc.id}"
+            key = getattr(att.doc, "access_key", None)
+            if key:
+                s += f"_{key}"
+            parts.append(s)
         elif att_type == "video" and att.video:
-            parts.append(f"video{att.video.owner_id}_{att.video.id}")
+            s = f"video{att.video.owner_id}_{att.video.id}"
+            key = getattr(att.video, "access_key", None)
+            if key:
+                s += f"_{key}"
+            parts.append(s)
     return ",".join(parts)
 
 

@@ -92,6 +92,25 @@ async def download(key: str) -> bytes:
         return await response["Body"].read()
 
 
+async def save_agreement(company_id: int, file_bytes: bytes, file_name: str, content_type: str = "application/octet-stream") -> str:
+    """Сохраняет файл согласия на ПД в S3 по пути agreements/{company_id}/{file_name}.
+
+    Args:
+        company_id: ID управляющей компании.
+        file_bytes: Содержимое файла.
+        file_name: Имя файла (будет использовано как последняя часть ключа).
+        content_type: MIME-тип файла.
+
+    Returns:
+        str: S3-ключ сохранённого файла.
+    """
+    key = f"agreements/{company_id}/{file_name}"
+    bucket = os.environ["S3_BUCKET"]
+    async with _client() as s3:
+        await s3.put_object(Bucket=bucket, Key=key, Body=file_bytes, ContentType=content_type)
+    return key
+
+
 async def get_presigned_url(key: str, expires: int = 3600) -> str:
     """Возвращает presigned URL на объект, действительный `expires` секунд.
 

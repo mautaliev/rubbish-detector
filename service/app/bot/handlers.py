@@ -16,7 +16,7 @@ from ...db.crud import report as crud_report
 from ...db.engine import SessionLocal
 from ...db.schemas import CleanerRead, CompanyRead
 from ..report_service import create_report
-from ..storage import download
+from ..storage import download, is_configured, save_agreement
 from .keyboard import (
     admin_keyboard,
     approve_reject_keyboard,
@@ -26,10 +26,12 @@ from .keyboard import (
     role_keyboard,
 )
 from .states import DialogState, clear_session, get_session, set_state
-from .vk_api import build_attachment_str, get_photo_url, send_message, upload_photo_for_message
+from .vk_api import get_photo_url, send_message, upload_doc_for_message, upload_photo_for_message
 
 logger = logging.getLogger(__name__)
 labeler = BotLabeler()
+
+_MAX_FILE_BYTES = 10 * 1024 * 1024  # 10 МБ
 
 _WELCOME_TEXT = (
     "Здравствуйте! Я бот RubbishDetector — автоматический контроль уборки территорий.\n\n"
@@ -489,6 +491,157 @@ async def _reg_company_phone(message: Message, session: dict) -> None:
     )
 
 
+async def _download_pd_files(attachments) -> list[dict]:
+    """Скачивает вложения формы ПД из VK CDN, возвращает список файлов с байтами.
+
+    Поддерживает фото и документы. Файлы, превышающие _MAX_FILE_BYTES,
+    пропускаются (размер уже проверен в _check_attachment_sizes, это страховка).
+
+    Args:
+        attachments: Список объектов вложений из входящего VK-сообщения.
+
+    Returns:
+        list[dict]: Каждый элемент содержит 'bytes', 'file_name', 'content_type', 'att_type'.
+    """
+    import mimetypes
+    import aiohttp
+
+    result = []
+    async with aiohttp.ClientSession() as http:
+        for att in attachments or []:
+            att_type = att.type.value if hasattr(att.type, "value") else str(att.type)
+            url = file_name = None
+            content_type = "application/octet-stream"
+
+            if att_type == "photo" and att.photo:
+                url = get_photo_url(att.photo)
+                file_name = f"photo_{att.photo.id}.jpg"
+                content_type = "image/jpeg"
+            elif att_type == "doc" and att.doc:
+                url = att.doc.url
+                ext = att.doc.ext or "bin"
+                file_name = f"doc_{att.doc.id}.{ext}"
+                content_type = mimetypes.guess_type(file_name)[0] or "application/octet-stream"
+
+            if not url or not file_name:
+                continue
+
+            try:
+                async with http.get(url) as resp:
+                    if resp.status != 200:
+                        logger.error(
+                            "Failed to download %s: HTTP %d", file_name, resp.status
+                        )
+                        continue
+                    file_bytes = await resp.read()
+                if not file_bytes:
+                    logger.error("Downloaded empty file for %s, skipping", file_name)
+                    continue
+                if len(file_bytes) > _MAX_FILE_BYTES:
+                    logger.warning("Agreement file %s exceeds 10 MB limit, skipping", file_name)
+                    continue
+                result.append({
+                    "bytes": file_bytes,
+                    "file_name": file_name,
+                    "content_type": content_type,
+                    "att_type": att_type,
+                })
+            except Exception:
+                logger.error("Failed to download agreement file %s", file_name, exc_info=True)
+
+    return result
+
+
+async def _save_pd_bytes_to_s3(files: list[dict], company_id: int) -> None:
+    """Сохраняет скачанные файлы согласия в S3.
+
+    Args:
+        files: Список файлов из _download_pd_files.
+        company_id: ID компании — используется в пути S3.
+    """
+    if not is_configured():
+        logger.warning("S3 not configured, skipping agreement save for company %d", company_id)
+        return
+    for f in files:
+        try:
+            await save_agreement(company_id, f["bytes"], f["file_name"], f["content_type"])
+            logger.info("Saved agreement file %s for company %d", f["file_name"], company_id)
+        except Exception:
+            logger.error(
+                "Failed to save agreement file %s to S3 for company %d",
+                f["file_name"], company_id,
+                exc_info=True,
+            )
+
+
+async def _upload_pd_to_vk(api, admin_id: int, files: list[dict]) -> str:
+    """Загружает файлы согласия в VK как собственные вложения бота.
+
+    Фото загружаются через Photos API, документы — через Docs API.
+    Ошибка отдельного файла не прерывает загрузку остальных.
+
+    Args:
+        api: VK API.
+        admin_id: VK-ID администратора (peer_id для загрузки).
+        files: Список файлов из _download_pd_files.
+
+    Returns:
+        str: Строка вложений вида 'photo123_456,doc789_012' для messages.send.
+    """
+    parts = []
+    for f in files:
+        try:
+            if f["att_type"] == "photo":
+                att_str = await upload_photo_for_message(api, admin_id, f["bytes"])
+            else:
+                att_str = await upload_doc_for_message(
+                    api, admin_id, f["bytes"], f["file_name"], f["content_type"]
+                )
+            parts.append(att_str)
+        except Exception:
+            logger.error("Failed to upload agreement file %s to VK", f["file_name"], exc_info=True)
+    return ",".join(parts)
+
+
+async def _check_attachment_sizes(attachments) -> bool:
+    """Проверяет, что ни одно вложение не превышает _MAX_FILE_BYTES.
+
+    Для документов размер берётся из метаданных VK без сетевого запроса.
+    Для фото выполняется HEAD-запрос к CDN VK за заголовком Content-Length.
+    Если размер определить не удалось, вложение считается допустимым —
+    финальный контроль остаётся на стороне _download_pd_files.
+
+    Args:
+        attachments: Список объектов вложений из входящего VK-сообщения.
+
+    Returns:
+        bool: True, если все вложения в пределах лимита; False, если хотя бы одно превышает.
+    """
+    import aiohttp
+
+    async with aiohttp.ClientSession() as http:
+        for att in attachments or []:
+            att_type = att.type.value if hasattr(att.type, "value") else str(att.type)
+
+            if att_type == "doc" and att.doc:
+                if att.doc.size and att.doc.size > _MAX_FILE_BYTES:
+                    return False
+
+            elif att_type == "photo" and att.photo:
+                url = get_photo_url(att.photo)
+                if not url:
+                    continue
+                try:
+                    async with http.head(url) as resp:
+                        declared = resp.headers.get("Content-Length")
+                        if declared and int(declared) > _MAX_FILE_BYTES:
+                            return False
+                except Exception:
+                    logger.warning("HEAD request failed for photo size check: %s", url)
+
+    return True
+
+
 async def _reg_company_pd_form(message: Message, session: dict) -> None:
     """Шаг 3 регистрации УК: получение подписанной формы ПД.
 
@@ -503,6 +656,15 @@ async def _reg_company_pd_form(message: Message, session: dict) -> None:
         await send_message(api, vk_user_id, "Пожалуйста, прикрепите заполненную форму согласия.")
         return
 
+    if not await _check_attachment_sizes(message.attachments):
+        await send_message(
+            api,
+            vk_user_id,
+            "Файл слишком большой. Максимальный размер — 10 МБ. "
+            "Пожалуйста, прикрепите файл меньшего размера.",
+        )
+        return
+
     name = session["data"]["company_name"]
     phone = session["data"]["company_phone"]
     invite_code = _gen_invite_code()
@@ -511,10 +673,16 @@ async def _reg_company_pd_form(message: Message, session: dict) -> None:
         _db_create_company, name, phone, vk_user_id, invite_code
     )
 
-    # Пересылаем форму ПД администратору
+    # Скачиваем файлы один раз — байты используем для S3 и для VK upload
+    files = await _download_pd_files(message.attachments)
+
+    # Сохраняем в S3 в фоне (байты уже есть, повторного скачивания нет)
+    if files:
+        asyncio.create_task(_save_pd_bytes_to_s3(files, company.id))
+
+    # Загружаем в VK как собственные файлы бота и уведомляем администратора
     admin_id = _admin_vk_id()
     if admin_id:
-        pd_attachment = build_attachment_str(message.attachments)
         admin_text = (
             f"Новая заявка на регистрацию УК:\n"
             f"Название: {name}\n"
@@ -522,10 +690,11 @@ async def _reg_company_pd_form(message: Message, session: dict) -> None:
             f"VK: vk.com/id{vk_user_id}"
         )
         try:
+            attachment = await _upload_pd_to_vk(api, admin_id, files) or None
             await api.messages.send(
                 user_id=admin_id,
                 message=admin_text,
-                attachment=pd_attachment or None,
+                attachment=attachment,
                 keyboard=approve_reject_keyboard(company.id),
                 random_id=0,
             )
