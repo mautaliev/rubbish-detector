@@ -10,6 +10,7 @@ import logging
 
 from PIL import Image
 
+from .anonymize import anonymize_bytes
 from .detector import detect
 from .storage import save_pair
 from ..db.crud import report as crud_report
@@ -66,7 +67,11 @@ async def create_report(
             else:
                 detected_bytes = photo_bytes
 
-            saved = await save_pair(company_id, photo_bytes, detected_bytes)
+            original_anon, detected_anon = await asyncio.gather(
+                asyncio.to_thread(anonymize_bytes, photo_bytes),
+                asyncio.to_thread(anonymize_bytes, detected_bytes),
+            )
+            saved = await save_pair(company_id, original_anon, detected_anon)
 
             classes: dict[str, int] = {}
             if result["found"]:

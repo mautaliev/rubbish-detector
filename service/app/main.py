@@ -24,6 +24,14 @@ async def lifespan(app: FastAPI):
     Бот запускается только если задана переменная окружения VK_TOKEN.
     При остановке приложения задача отменяется.
     """
+    if os.environ.get("VK_TOKEN"):
+        try:
+            from .anonymize import warmup as _anonymize_warmup
+            await asyncio.to_thread(_anonymize_warmup)
+            logger.info("Anonymization models warmed up")
+        except Exception:
+            logger.warning("Anonymization warmup failed — models will load on first use", exc_info=True)
+
     task = None
     if os.environ.get("VK_TOKEN"):
         try:
