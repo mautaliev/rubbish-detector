@@ -97,10 +97,23 @@ async def upload_photo_for_message(api, peer_id: int, photo_bytes: bytes) -> str
         form = aiohttp.FormData()
         form.add_field("photo", photo_bytes, filename="photo.jpg", content_type="image/jpeg")
         async with session.post(upload_server.upload_url, data=form) as resp:
-            data = await resp.json(content_type=None)
+            raw = await resp.text()
+            try:
+                data = json.loads(raw)
+            except json.JSONDecodeError:
+                raise RuntimeError(
+                    f"VK photo upload server returned non-JSON (HTTP {resp.status}): {raw[:300]!r}"
+                )
+
+    logger.debug("VK photo upload response: %s", data)
+    photo_field = data.get("photo", "")
+    if not photo_field or photo_field in ("[]", "null"):
+        raise RuntimeError(
+            f"VK photo upload server rejected the image (photo field empty): {data!r}"
+        )
 
     saved = await api.photos.save_messages_photo(
-        photo=data["photo"],
+        photo=photo_field,
         server=data["server"],
         hash=data["hash"],
     )

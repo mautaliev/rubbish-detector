@@ -13,6 +13,7 @@ anonymize.py — обезличивание изображений перед с
 """
 
 import os
+import threading
 from functools import lru_cache
 from pathlib import Path
 
@@ -20,6 +21,9 @@ import cv2
 import numpy as np
 from deface.centerface import CenterFace
 from ultralytics import YOLO
+
+# OpenCV DNN is not thread-safe: serialize all inference calls
+_INFERENCE_LOCK = threading.Lock()
 
 # Папка models/ в корне репозитория
 _MODELS_DIR = Path(__file__).resolve().parents[2] / "models"
@@ -76,14 +80,15 @@ def anonymize_bgr(img: np.ndarray) -> np.ndarray:
     Returns:
         np.ndarray: То же изображение с пикселизованными лицами и номерами.
     """
-    dets, _ = _face_detector()(img, threshold=FACE_THRESH)
-    for x1, y1, x2, y2, _score in dets:
-        _pixelate(img, x1, y1, x2, y2, blocks=8)
+    with _INFERENCE_LOCK:
+        dets, _ = _face_detector()(img, threshold=FACE_THRESH)
+        for x1, y1, x2, y2, _score in dets:
+            _pixelate(img, x1, y1, x2, y2, blocks=8)
 
-    results = _plate_detector()(img, conf=PLATE_CONF, verbose=False)
-    for box in results[0].boxes.xyxy.cpu().numpy():
-        x1, y1, x2, y2 = box[:4]
-        _pixelate(img, x1, y1, x2, y2, blocks=6)
+        results = _plate_detector()(img, conf=PLATE_CONF, verbose=False)
+        for box in results[0].boxes.xyxy.cpu().numpy():
+            x1, y1, x2, y2 = box[:4]
+            _pixelate(img, x1, y1, x2, y2, blocks=6)
 
     return img
 

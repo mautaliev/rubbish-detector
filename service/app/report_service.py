@@ -54,8 +54,12 @@ async def create_report(
     """
     detect_class = model_version == ModelVersion.multi_class
 
+    logger.warning(
+        "create_report: cleaner=%d company=%d photos_in=%d",
+        cleaner_id, company_id, len(photo_bytes_list),
+    )
     photos: list[PhotoResult] = []
-    for photo_bytes in photo_bytes_list:
+    for idx, photo_bytes in enumerate(photo_bytes_list):
         try:
             img = Image.open(io.BytesIO(photo_bytes)).convert("RGB")
             result = await asyncio.to_thread(detect, img, detect_class, 0.25)
@@ -67,10 +71,8 @@ async def create_report(
             else:
                 detected_bytes = photo_bytes
 
-            original_anon, detected_anon = await asyncio.gather(
-                asyncio.to_thread(anonymize_bytes, photo_bytes),
-                asyncio.to_thread(anonymize_bytes, detected_bytes),
-            )
+            original_anon = await asyncio.to_thread(anonymize_bytes, photo_bytes)
+            detected_anon = await asyncio.to_thread(anonymize_bytes, detected_bytes)
             saved = await save_pair(company_id, original_anon, detected_anon)
 
             classes: dict[str, int] = {}
@@ -86,14 +88,21 @@ async def create_report(
                     is_clean=(result["total"] == 0),
                 )
             )
+            logger.warning(
+                "create_report: photo %d/%d OK (objects=%d)",
+                idx + 1, len(photo_bytes_list), result["total"],
+            )
         except Exception:
             logger.error(
-                "Failed to process photo for cleaner %d, company %d",
-                cleaner_id,
-                company_id,
+                "create_report: photo %d/%d FAILED cleaner=%d",
+                idx + 1, len(photo_bytes_list), cleaner_id,
                 exc_info=True,
             )
 
+    logger.warning(
+        "create_report: saved %d/%d for cleaner=%d",
+        len(photos), len(photo_bytes_list), cleaner_id,
+    )
     if not photos:
         raise ValueError("No photos could be processed")
 

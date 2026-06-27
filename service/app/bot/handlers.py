@@ -1,12 +1,15 @@
 """Обработчики сообщений VK-бота по ролям и состояниям диалога."""
 
 import asyncio
+import io
 import json
 import logging
 import os
 import random
 import string
 from datetime import datetime, timedelta, timezone
+
+from PIL import Image
 
 from vkbottle.bot import BotLabeler, Message
 
@@ -32,6 +35,29 @@ logger = logging.getLogger(__name__)
 labeler = BotLabeler()
 
 _MAX_FILE_BYTES = 10 * 1024 * 1024  # 10 МБ
+
+# VK доставляет несколько фото из одного сообщения как отдельные события через long polling.
+# Буферизируем фото каждого дворника и запускаем отчёт после паузы.
+_PHOTO_BUFFER_DELAY = 5.0
+_photo_buffers: dict[int, dict] = {}
+
+
+def _to_vk_jpeg(data: bytes) -> bytes:
+    """Перекодирует байты изображения в стандартный JPEG, совместимый с VK upload server.
+
+    OpenCV-JPEG иногда содержит нестандартные заголовки, которые VK не принимает
+    и возвращает пустое поле photo. PIL гарантирует JFIF-совместимый формат.
+
+    Args:
+        data: Байты изображения в любом формате, поддерживаемом PIL.
+
+    Returns:
+        bytes: Байты JPEG-изображения.
+    """
+    img = Image.open(io.BytesIO(data)).convert("RGB")
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=92)
+    return buf.getvalue()
 
 _WELCOME_TEXT = (
     "Здравствуйте! Я бот RubbishDetector — автоматический контроль уборки территорий.\n\n"
@@ -181,6 +207,24 @@ async def main_handler(message: Message) -> None:
     """
     vk_user_id = message.from_id
     api = message.ctx_api
+    atts = message.attachments or []
+    fwd = message.fwd_messages or []
+    att_types = [
+        (att.type.value if hasattr(att.type, "value") else str(att.type))
+        for att in atts
+    ]
+    fwd_att_types = [
+        [
+            (a.type.value if hasattr(a.type, "value") else str(a.type))
+            for a in (m.attachments or [])
+        ]
+        for m in fwd
+    ]
+    logger.warning(
+        "MSG from vk_id=%d text=%r attachments=%d types=%s fwd_msgs=%d is_cropped=%s",
+        vk_user_id, (message.text or "")[:40], len(atts), att_types,
+        len(fwd), getattr(message, "is_cropped", False),
+    )
     session = get_session(vk_user_id)
     state = session["state"]
 
@@ -277,6 +321,9 @@ async def _handle_company_user(api, vk_user_id: int, company: CompanyRead) -> No
 async def _handle_cleaner_message(message: Message, cleaner: CleanerRead) -> None:
     """Обрабатывает сообщение от зарегистрированного дворника.
 
+    VK доставляет несколько фото одного сообщения как отдельные события,
+    поэтому фото буферизируются на _PHOTO_BUFFER_DELAY секунд перед отправкой в обработку.
+
     Args:
         message: Входящее VK-сообщение.
         cleaner: Данные дворника из БД.
@@ -284,13 +331,31 @@ async def _handle_cleaner_message(message: Message, cleaner: CleanerRead) -> Non
     api = message.ctx_api
     vk_user_id = message.from_id
 
-    photo_atts = [
-        att for att in (message.attachments or [])
-        if (att.type.value if hasattr(att.type, "value") else str(att.type)) == "photo"
-    ]
+    def _is_photo(att) -> bool:
+        return (att.type.value if hasattr(att.type, "value") else str(att.type)) == "photo"
+
+    # is_cropped=True: VK обрезал сообщение, передав только первое вложение.
+    # Запрашиваем полный объект через messages.getById.
+    if getattr(message, "is_cropped", False):
+        try:
+            resp = await api.messages.get_by_id(message_ids=[message.id])
+            full_atts = resp.items[0].attachments if (resp and resp.items) else (message.attachments or [])
+            logger.warning(
+                "is_cropped: fetched full msg, attachments=%d", len(full_atts or [])
+            )
+        except Exception:
+            logger.error("is_cropped: failed to fetch full message", exc_info=True)
+            full_atts = message.attachments or []
+    else:
+        full_atts = message.attachments or []
+
+    photo_atts = [att for att in (full_atts or []) if _is_photo(att)]
+    for fwd_msg in (message.fwd_messages or []):
+        photo_atts += [att for att in (fwd_msg.attachments or []) if _is_photo(att)]
+
     non_photo_atts = [
         att for att in (message.attachments or [])
-        if (att.type.value if hasattr(att.type, "value") else str(att.type)) != "photo"
+        if not _is_photo(att)
     ]
 
     if not photo_atts:
@@ -310,13 +375,53 @@ async def _handle_cleaner_message(message: Message, cleaner: CleanerRead) -> Non
             )
         return
 
-    # Мгновенный ответ — VK CDN не ждёт
-    await send_message(api, vk_user_id, "Фото получены, обрабатываю...")
+    is_new_buffer = vk_user_id not in _photo_buffers
+    if is_new_buffer:
+        _photo_buffers[vk_user_id] = {"photo_atts": [], "comment": None, "task": None}
 
-    comment = (message.text or "").strip() or None
-    asyncio.create_task(
-        _process_report(api, vk_user_id, cleaner, photo_atts, comment)
+    buf = _photo_buffers[vk_user_id]
+    buf["photo_atts"].extend(photo_atts)
+    logger.warning(
+        "Cleaner vk=%d: received %d photo(s), buffer total=%d",
+        vk_user_id, len(photo_atts), len(buf["photo_atts"]),
     )
+    if not buf["comment"]:
+        buf["comment"] = (message.text or "").strip() or None
+
+    # Мгновенный ответ только при первом фото из серии
+    if is_new_buffer:
+        await send_message(api, vk_user_id, "Фото получены, обрабатываю...")
+
+    # Перезапускаем таймер: отсчёт ведётся от последнего полученного фото
+    if buf["task"] and not buf["task"].done():
+        buf["task"].cancel()
+    buf["task"] = asyncio.create_task(_flush_photo_buffer(api, vk_user_id, cleaner))
+
+
+async def _flush_photo_buffer(api, vk_user_id: int, cleaner: CleanerRead) -> None:
+    """Ждёт окончания серии фото и запускает обработку отчёта.
+
+    Args:
+        api: VK API.
+        vk_user_id: VK-ID дворника.
+        cleaner: Данные дворника из БД.
+    """
+    try:
+        await asyncio.sleep(_PHOTO_BUFFER_DELAY)
+    except asyncio.CancelledError:
+        return  # пришли новые фото — новый таймер уже запущен
+
+    buf = _photo_buffers.pop(vk_user_id, None)
+    if not buf or not buf["photo_atts"]:
+        return
+
+    logger.warning(
+        "Flushing buffer for vk=%d: %d photo(s)", vk_user_id, len(buf["photo_atts"])
+    )
+    try:
+        await _process_report(api, vk_user_id, cleaner, buf["photo_atts"], buf["comment"])
+    except Exception:
+        logger.error("_process_report crashed for vk=%d", vk_user_id, exc_info=True)
 
 
 # ---------------------------------------------------------------------------
@@ -334,19 +439,24 @@ async def _process_report(api, vk_user_id: int, cleaner: CleanerRead, photo_atts
         comment: Текстовый комментарий дворника или None.
     """
     # Скачиваем фото с CDN VK
+    logger.warning("_process_report: vk=%d atts=%d", vk_user_id, len(photo_atts))
     photo_bytes_list: list[bytes] = []
     for att in photo_atts:
         url = get_photo_url(att.photo)
         if not url:
+            logger.warning("vk=%d: no URL for attachment, skipping", vk_user_id)
             continue
         try:
             import aiohttp
             async with aiohttp.ClientSession() as session:
                 async with session.get(url) as resp:
-                    photo_bytes_list.append(await resp.read())
+                    data = await resp.read()
+                    photo_bytes_list.append(data)
+                    logger.warning("vk=%d: downloaded %d bytes", vk_user_id, len(data))
         except Exception:
             logger.error("Failed to download photo from VK CDN: %s", url, exc_info=True)
 
+    logger.warning("vk=%d: downloaded %d/%d", vk_user_id, len(photo_bytes_list), len(photo_atts))
     if not photo_bytes_list:
         await send_message(
             api,
@@ -431,6 +541,7 @@ async def _notify_company(api, cleaner: CleanerRead, company: CompanyRead, repor
     for key in keys:
         try:
             photo_bytes = await download(key)
+            photo_bytes = await asyncio.to_thread(_to_vk_jpeg, photo_bytes)
             att_str = await upload_photo_for_message(api, controller_vk_id, photo_bytes)
             attachment_parts.append(att_str)
         except Exception:
@@ -592,7 +703,8 @@ async def _upload_pd_to_vk(api, admin_id: int, files: list[dict]) -> str:
     for f in files:
         try:
             if f["att_type"] == "photo":
-                att_str = await upload_photo_for_message(api, admin_id, f["bytes"])
+                photo_bytes = await asyncio.to_thread(_to_vk_jpeg, f["bytes"])
+                att_str = await upload_photo_for_message(api, admin_id, photo_bytes)
             else:
                 att_str = await upload_doc_for_message(
                     api, admin_id, f["bytes"], f["file_name"], f["content_type"]
