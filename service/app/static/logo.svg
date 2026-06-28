@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <clipPath id="lens"><circle cx="262" cy="236" r="128"/></clipPath>
+  </defs>
+  <!-- handle (lower-left) -->
+  <line x1="160" y1="334" x2="80" y2="414" stroke="#F2A14B" stroke-width="38" stroke-linecap="round"/>
+  <!-- rim -->
+  <circle cx="262" cy="236" r="150" fill="#F2A14B"/>
+  <!-- glass -->
+  <circle cx="262" cy="236" r="128" fill="#EAF1F8"/>
+  <!-- pigeon head, +10% scaled about the lens centre -->
+  <g clip-path="url(#lens)">
+    <g transform="translate(-26.2 -23.6) scale(1.1)">
+      <!-- head -->
+      <path d="M232,178 C264,174 290,194 300,232 C306,248 306,262 298,274
+               C284,298 256,302 238,298 C210,292 194,270 192,240
+               C190,212 204,190 232,178 Z" fill="#2B5C8A"/>
+      <!-- beak (slender) -->
+      <path d="M296,230 C320,230 342,238 358,250 C342,262 316,266 296,260 C299,250 297,238 296,230 Z" fill="#F2A14B"/>
+      <!-- cere -->
+      <ellipse cx="300" cy="228" rx="11" ry="7" transform="rotate(-18 300 228)" fill="#FFFFFF"/>
+      <!-- eye -->
+      <circle cx="268" cy="222" r="17" fill="#F2A14B"/>
+      <circle cx="268" cy="222" r="10" fill="#15243B"/>
+      <circle cx="272" cy="218" r="3.6" fill="#FFFFFF"/>
+    </g>
+  </g>
+</svg>
