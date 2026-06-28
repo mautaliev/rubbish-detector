@@ -1,90 +1,319 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Rubbish Detector</title>
-  <link rel="stylesheet" href="/static/style.css" />
-  <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RubbishDetector — проверка фото</title>
+<link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;800&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0E1116;
+  --ink-2:#161B22;
+  --paper:#F6F7F4;
+  --card:#FFFFFF;
+  --scan:#15BC68;
+  --scan-soft:#E4F7EC;
+  --flag:#FF5247;
+  --flag-soft:#FFEAE8;
+  --vk:#2787F5;
+  --mist:#E4E7E1;
+  --slate:#5C6672;
+  --line:rgba(14,17,22,.10);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:'Manrope',sans-serif;
+  background:var(--paper);
+  color:var(--ink);
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+.mono{font-family:'JetBrains Mono',monospace}
+.hidden{display:none!important}
+
+body::before{
+  content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:64px 64px;
+  -webkit-mask-image:radial-gradient(circle at 50% 0,#000,transparent 70%);
+          mask-image:radial-gradient(circle at 50% 0,#000,transparent 70%);
+  opacity:.5;
+}
+main,nav,footer{position:relative;z-index:1}
+
+/* ---------- nav ---------- */
+nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);
+  background:rgba(246,247,244,.78);border-bottom:1px solid var(--line)}
+.nav-in{display:flex;align-items:center;justify-content:space-between;height:64px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:-.01em}
+.logo small{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--slate);font-weight:500}
+.nav-links{display:flex;align-items:center;gap:28px}
+.nav-links a{font-size:14px;color:var(--slate);font-weight:500}
+.nav-links a:hover{color:var(--ink)}
+.btn{display:inline-flex;align-items:center;gap:9px;font-weight:600;border-radius:12px;
+  padding:11px 18px;font-size:14.5px;cursor:pointer;border:none;
+  transition:transform .15s,box-shadow .15s,background .15s}
+.btn-scan{background:var(--scan);color:#fff;box-shadow:0 6px 18px -8px var(--scan)}
+.btn-scan:hover{transform:translateY(-2px);box-shadow:0 12px 26px -10px var(--scan)}
+.nav .btn{padding:9px 16px}
+
+/* ---------- tool section ---------- */
+.tool-wrap{padding:72px 0 80px}
+
+.tool-header{margin-bottom:36px}
+h1{font-family:'Unbounded',sans-serif;font-weight:700;font-size:clamp(28px,4vw,46px);
+  line-height:1.06;letter-spacing:-.02em}
+h1 .hl{color:var(--scan)}
+.lead{font-size:17px;color:var(--slate);margin-top:0;margin-bottom:20px;max-width:52em}
+
+.tool-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:40px;align-items:stretch}
+
+/* ---------- guide accordion ---------- */
+.guide{border:1px solid var(--line);border-radius:14px;background:var(--card);overflow:hidden;margin-bottom:20px}
+.guide summary{padding:14px 18px;font-weight:600;font-size:14px;color:var(--ink);
+  cursor:pointer;user-select:none;list-style:none;display:flex;align-items:center;gap:10px}
+.guide summary::-webkit-details-marker{display:none}
+.guide summary::before{content:"▶";font-size:10px;transition:transform .2s;color:var(--slate)}
+.guide[open] summary::before{transform:rotate(90deg)}
+.guide-body{display:flex;border-top:1px solid var(--line)}
+.guide-col{flex:1;padding:14px 18px}
+.guide-col:first-child{border-right:1px solid var(--line)}
+.guide-col ul{margin:6px 0 0;padding-left:18px;color:var(--slate);font-size:13.5px;line-height:1.7}
+.guide-label{margin:0 0 4px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.04em}
+.guide-label--ok{color:var(--scan)}
+.guide-label--no{color:var(--flag)}
+
+/* ---------- upload zone ---------- */
+.upload-zone{display:flex;align-items:center;justify-content:center;gap:10px;
+  border:1.5px dashed var(--mist);border-radius:14px;padding:16px 22px;cursor:pointer;
+  font-weight:600;font-size:15px;width:100%;color:var(--ink);
+  transition:border-color .2s,background .2s,color .2s}
+.upload-zone:hover{border-color:var(--scan);background:var(--scan-soft);color:var(--scan)}
+.upload-zone svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.9;flex:none}
+#imageInput{display:none}
+
+/* ---------- controls ---------- */
+.tool-controls{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;
+  flex-wrap:wrap;margin-top:18px}
+.tool-check{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:var(--slate);
+  cursor:pointer;line-height:1.45;flex:1;min-width:0}
+.tool-check input[type=checkbox]{margin-top:2px;flex:none;accent-color:var(--scan);width:16px;height:16px;cursor:pointer}
+#checkButton{background:var(--scan);color:#fff;border:none;border-radius:12px;padding:12px 24px;
+  font-weight:700;font-size:15px;cursor:pointer;white-space:nowrap;flex:none;
+  transition:transform .15s,box-shadow .15s;box-shadow:0 6px 18px -8px var(--scan);
+  font-family:'Manrope',sans-serif}
+#checkButton:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 12px 26px -10px var(--scan)}
+#checkButton:disabled{background:var(--mist);color:var(--slate);cursor:not-allowed;box-shadow:none;transform:none}
+
+/* ---------- result ---------- */
+.tool-result{margin-top:18px;font-size:15px;line-height:1.55}
+.tool-result .success{color:var(--scan);font-weight:600}
+.tool-result .error{color:var(--flag);font-weight:600}
+.tool-result ul{margin:8px 0 0;padding-left:20px;color:var(--slate);font-size:14px;line-height:1.8}
+
+/* ---------- preview card ---------- */
+.preview-col{display:flex;flex-direction:column}
+.preview-card{
+  flex:1;
+  position:relative;border-radius:20px;overflow:hidden;
+  background:var(--card);border:1.5px dashed var(--mist);
+  display:flex;flex-direction:column;
+}
+/* corner brackets */
+.brk::before,.brk::after{content:"";position:absolute;width:18px;height:18px;pointer-events:none;z-index:2}
+.brk::before{top:-1px;left:-1px;border-top:2px solid var(--scan);border-left:2px solid var(--scan);border-top-left-radius:5px}
+.brk::after{bottom:-1px;right:-1px;border-bottom:2px solid var(--scan);border-right:2px solid var(--scan);border-bottom-right-radius:5px}
+#preview{width:100%;height:auto;display:block}
+.ph-placeholder{
+  flex:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:14px;padding:40px;text-align:center;
+  color:#C4C9C6;
+}
+.ph-placeholder svg{width:52px;height:52px;stroke:currentColor;fill:none;stroke-width:1.2}
+.ph-placeholder p{font-size:13px;margin:0;font-family:'JetBrains Mono',monospace;letter-spacing:.02em}
+
+/* ---------- footer ---------- */
+footer{padding:48px 0 56px;border-top:1px solid var(--line)}
+.foot{display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap}
+.foot-links{display:flex;gap:26px;font-size:14px;color:var(--slate)}
+.foot-links a:hover{color:var(--ink)}
+.foot .mono{font-size:12px;color:var(--slate)}
+
+/* ---------- reveal ---------- */
+.rev{opacity:0;transform:translateY(22px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+.rev.show{opacity:1;transform:none}
+
+/* ---------- responsive ---------- */
+@media(max-width:960px){
+  .tool-grid{grid-template-columns:1fr;align-items:start}
+  .preview-col{min-height:320px}
+  .nav-links a:not(.btn){display:none}
+}
+@media(max-width:640px){
+  .tool-wrap{padding:48px 0 64px}
+  .guide-body{flex-direction:column}
+  .guide-col:first-child{border-right:none;border-bottom:1px solid var(--line)}
+}
+@media(prefers-reduced-motion:reduce){
+  .rev{opacity:1;transform:none;transition:none}
+  html{scroll-behavior:auto}
+}
+:focus-visible{outline:3px solid var(--vk);outline-offset:3px;border-radius:6px}
+</style>
 </head>
 <body>
-  <main class="page">
-    <section class="card">
-      <div style="display:flex;align-items:center;gap:16px;margin-bottom:8px;">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="72" height="72" style="flex-shrink:0;">
-          <defs><clipPath id="lens"><circle cx="262" cy="236" r="128"/></clipPath></defs>
-          <line x1="160" y1="334" x2="80" y2="414" stroke="#F2A14B" stroke-width="38" stroke-linecap="round"/>
-          <circle cx="262" cy="236" r="150" fill="#F2A14B"/>
-          <circle cx="262" cy="236" r="128" fill="#EAF1F8"/>
-          <g clip-path="url(#lens)">
-            <g transform="translate(-26.2 -23.6) scale(1.1)">
-              <path d="M232,178 C264,174 290,194 300,232 C306,248 306,262 298,274 C284,298 256,302 238,298 C210,292 194,270 192,240 C190,212 204,190 232,178 Z" fill="#2B5C8A"/>
-              <path d="M296,230 C320,230 342,238 358,250 C342,262 316,266 296,260 C299,250 297,238 296,230 Z" fill="#F2A14B"/>
-              <ellipse cx="300" cy="228" rx="11" ry="7" transform="rotate(-18 300 228)" fill="#FFFFFF"/>
-              <circle cx="268" cy="222" r="17" fill="#F2A14B"/>
-              <circle cx="268" cy="222" r="10" fill="#15243B"/>
-              <circle cx="272" cy="218" r="3.6" fill="#FFFFFF"/>
-            </g>
+
+<!-- ============ NAV ============ -->
+<nav>
+  <div class="wrap nav-in">
+    <a class="logo" href="/">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="28" height="28" style="flex:none">
+        <defs><clipPath id="logo-lens-nav"><circle cx="262" cy="236" r="128"/></clipPath></defs>
+        <line x1="160" y1="334" x2="80" y2="414" stroke="#F2A14B" stroke-width="38" stroke-linecap="round"/>
+        <circle cx="262" cy="236" r="150" fill="#F2A14B"/>
+        <circle cx="262" cy="236" r="128" fill="#EAF1F8"/>
+        <g clip-path="url(#logo-lens-nav)">
+          <g transform="translate(-26.2 -23.6) scale(1.1)">
+            <path d="M232,178 C264,174 290,194 300,232 C306,248 306,262 298,274 C284,298 256,302 238,298 C210,292 194,270 192,240 C190,212 204,190 232,178 Z" fill="#2B5C8A"/>
+            <path d="M296,230 C320,230 342,238 358,250 C342,262 316,266 296,260 C299,250 297,238 296,230 Z" fill="#F2A14B"/>
+            <ellipse cx="300" cy="228" rx="11" ry="7" transform="rotate(-18 300 228)" fill="#FFFFFF"/>
+            <circle cx="268" cy="222" r="17" fill="#F2A14B"/>
+            <circle cx="268" cy="222" r="10" fill="#15243B"/>
+            <circle cx="272" cy="218" r="3.6" fill="#FFFFFF"/>
           </g>
-        </svg>
-        <h1 style="margin:0;flex:1;">Интеллектуальная система мониторинга антропогенного загрязнения городской среды</h1>
-      </div>
-      <p class="hint">Загрузите фотографию городской среды — система обнаружит на ней следы антропогенного загрязнения и отметит их рамкой.</p>
+        </g>
+      </svg>
+      RubbishDetector
+    </a>
+    <div class="nav-links">
+      <a href="/privacy">Политика конфиденциальности</a>
+      <a href="/bot" class="btn btn-scan">VK-бот</a>
+    </div>
+  </div>
+</nav>
 
-      <details class="guide">
-        <summary>Какие изображения подходят для анализа?</summary>
-        <div class="guide-body">
-          <div class="guide-col">
-            <p class="guide-label guide-label--ok">Подходят</p>
-            <ul>
-              <li>Фотографии улиц, дворов, парков, газонов, обочин</li>
-              <li>Снимки в естественных условиях: разное время суток, погода, ракурс</li>
-              <li>Съёмка с уровня человека или с небольшой высоты</li>
-              <li>Изображения с любым количеством мусора, в том числе мелкого</li>
-            </ul>
+<main>
+
+<section class="tool-wrap">
+  <div class="wrap">
+
+    <!-- Full-width header -->
+    <div class="tool-header rev show">
+      <h1>Проверьте фото на <span class="hl">наличие мусора</span></h1>
+    </div>
+
+    <!-- Two-column grid -->
+    <div class="tool-grid">
+
+      <!-- LEFT: controls -->
+      <div class="rev show">
+        <p class="lead">Загрузите снимок городской среды — нейросеть найдёт следы загрязнения и отметит каждый объект рамкой.</p>
+        <details class="guide">
+          <summary>Какие изображения подходят для анализа?</summary>
+          <div class="guide-body">
+            <div class="guide-col">
+              <p class="guide-label guide-label--ok">Подходят</p>
+              <ul>
+                <li>Фотографии улиц, дворов, парков, газонов, обочин</li>
+                <li>Снимки в естественных условиях: время суток, погода, ракурс</li>
+                <li>Съёмка с уровня человека или с небольшой высоты</li>
+                <li>Любое количество мусора, включая мелкий</li>
+              </ul>
+            </div>
+            <div class="guide-col">
+              <p class="guide-label guide-label--no">Не подходят</p>
+              <ul>
+                <li>Фотографии из помещений (квартира, офис, склад)</li>
+                <li>Сильно смазанные или крайне тёмные снимки</li>
+                <li>Аэрофотосъёмка с большой высоты</li>
+                <li>Рендеры, схемы, скриншоты карт</li>
+                <li>Зимние фотографии</li>
+              </ul>
+            </div>
           </div>
-          <div class="guide-col">
-            <p class="guide-label guide-label--no">Не подходят</p>
-            <ul>
-              <li>Фотографии из помещений (квартира, офис, склад)</li>
-              <li>Сильно смазанные или крайне тёмные снимки</li>
-              <li>Аэрофотосъёмка с большой высоты</li>
-              <li>Рендеры, схемы, скриншоты карт</li>
-              <li>Фотографии в зимнее время года</li>
-            </ul>
-          </div>
-        </div>
-      </details>
+        </details>
 
-      <label class="upload">
-        <input id="imageInput" type="file" accept="image/*" />
-        <span>Выбрать изображение</span>
-      </label>
-
-      <div class="preview-wrap">
-        <img id="preview" class="preview hidden" alt="Загруженное изображение" />
-        <div id="placeholder" class="placeholder">Изображение пока не выбрано</div>
-      </div>
-
-      <div class="controls">
-        <label class="checkbox">
-          <input id="detectClass" type="checkbox" />
-          <span>Использовать модель с классификацией источника загрязнения (результаты могут отличаться)</span>
+        <label class="upload-zone" for="imageInput">
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span>Выбрать изображение</span>
+          <input id="imageInput" type="file" accept="image/*">
         </label>
 
-        <button id="checkButton" type="button" disabled>Проверить</button>
+        <div class="tool-controls">
+          <label class="tool-check">
+            <input id="detectClass" type="checkbox">
+            <span>Классификация типа загрязнения (результаты могут отличаться)</span>
+          </label>
+          <button id="checkButton" type="button" disabled>Проверить</button>
+        </div>
+
+        <div id="result" class="tool-result"></div>
       </div>
 
-      <div id="result" class="result"></div>
-
-      <div class="privacy-btn-wrapper">
-          <a href="/privacy" class="upload" style="margin-bottom:0;text-decoration:none;color:inherit;">
-            <span>Политика конфиденциальности</span>
-          </a>
+      <!-- RIGHT: preview -->
+      <div class="preview-col rev show">
+        <div class="preview-card brk">
+          <img id="preview" class="preview hidden" alt="Загруженное изображение">
+          <div id="placeholder" class="ph-placeholder">
+            <svg viewBox="0 0 24 24">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <polyline points="21 15 16 10 5 21"/>
+            </svg>
+            <p>Изображение пока не выбрано</p>
+          </div>
+        </div>
       </div>
-    </section>
-  </main>
 
-  <script src="/static/app.js"></script>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ============ FOOTER ============ -->
+<footer>
+  <div class="wrap foot">
+    <a class="logo" href="/">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="28" height="28" style="flex:none">
+        <defs><clipPath id="logo-lens-foot"><circle cx="262" cy="236" r="128"/></clipPath></defs>
+        <line x1="160" y1="334" x2="80" y2="414" stroke="#F2A14B" stroke-width="38" stroke-linecap="round"/>
+        <circle cx="262" cy="236" r="150" fill="#F2A14B"/>
+        <circle cx="262" cy="236" r="128" fill="#EAF1F8"/>
+        <g clip-path="url(#logo-lens-foot)">
+          <g transform="translate(-26.2 -23.6) scale(1.1)">
+            <path d="M232,178 C264,174 290,194 300,232 C306,248 306,262 298,274 C284,298 256,302 238,298 C210,292 194,270 192,240 C190,212 204,190 232,178 Z" fill="#2B5C8A"/>
+            <path d="M296,230 C320,230 342,238 358,250 C342,262 316,266 296,260 C299,250 297,238 296,230 Z" fill="#F2A14B"/>
+            <ellipse cx="300" cy="228" rx="11" ry="7" transform="rotate(-18 300 228)" fill="#FFFFFF"/>
+            <circle cx="268" cy="222" r="17" fill="#F2A14B"/>
+            <circle cx="268" cy="222" r="10" fill="#15243B"/>
+            <circle cx="272" cy="218" r="3.6" fill="#FFFFFF"/>
+          </g>
+        </g>
+      </svg>
+      RubbishDetector
+    </a>
+    <div class="foot-links">
+      <a href="/bot">VK-бот</a>
+      <a href="/privacy">Политика конфиденциальности</a>
+      <a href="https://vk.com/rubbish_detector">Сообщество VK</a>
+    </div>
+    <span class="mono">© 2026 · контроль уборки на нейросетях</span>
+  </div>
+</footer>
+
+<script src="/static/app.js"></script>
+<script>
+const io=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('show');io.unobserve(e.target)}})},{threshold:.12});
+document.querySelectorAll('.rev').forEach((el,i)=>{el.style.transitionDelay=(i%3*60)+'ms';io.observe(el)});
+</script>
 </body>
 </html>
