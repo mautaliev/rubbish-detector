@@ -123,6 +123,12 @@ async def privacy():
     return FileResponse("service/app/static/privacy.html")
 
 
+@app.get("/bot")
+def bot():
+    """Возвращает лендинг VK-бота."""
+    return FileResponse("service/app/static/bot.html")
+
+
 @app.get("/testlab")
 def testlab(_: None = Depends(require_local)):
     """Возвращает страницу Test Lab. Доступна только при TESTLAB_ENABLED=1.

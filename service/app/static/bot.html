@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RubbishDetector — бот для контроля уборки дворов</title>
+<link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;800&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0E1116;
+  --ink-2:#161B22;
+  --paper:#F6F7F4;
+  --card:#FFFFFF;
+  --scan:#15BC68;
+  --scan-soft:#E4F7EC;
+  --flag:#FF5247;
+  --flag-soft:#FFEAE8;
+  --vk:#2787F5;
+  --mist:#E4E7E1;
+  --slate:#5C6672;
+  --line:rgba(14,17,22,.10);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:'Manrope',sans-serif;
+  background:var(--paper);
+  color:var(--ink);
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+.mono{font-family:'JetBrains Mono',monospace}
+
+/* subtle analysis grid behind everything */
+body::before{
+  content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:64px 64px;
+  -webkit-mask-image:radial-gradient(circle at 50% 0,#000,transparent 70%);
+          mask-image:radial-gradient(circle at 50% 0,#000,transparent 70%);
+  opacity:.5;
+}
+main,nav,footer{position:relative;z-index:1}
+
+/* ---------- nav ---------- */
+nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);
+  background:rgba(246,247,244,.78);border-bottom:1px solid var(--line)}
+.nav-in{display:flex;align-items:center;justify-content:space-between;height:64px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:-.01em}
+.logo small{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--slate);font-weight:500}
+.nav-links{display:flex;align-items:center;gap:28px}
+.nav-links a{font-size:14px;color:var(--slate);font-weight:500}
+.nav-links a:hover{color:var(--ink)}
+.btn{display:inline-flex;align-items:center;gap:9px;font-weight:600;border-radius:12px;
+  padding:11px 18px;font-size:14.5px;cursor:pointer;border:none;transition:transform .15s,box-shadow .15s,background .15s}
+.btn-vk{background:var(--vk);color:#fff;box-shadow:0 6px 18px -8px var(--vk)}
+.btn-vk:hover{transform:translateY(-2px);box-shadow:0 12px 26px -10px var(--vk)}
+.btn-ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+.btn-ghost:hover{background:#fff}
+.vk-glyph{font-weight:800;font-family:'Manrope';font-size:15px}
+.nav .btn{padding:9px 16px}
+
+/* ---------- hero ---------- */
+.hero{padding:84px 0 72px}
+.hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;
+  font-size:12px;font-weight:500;color:var(--scan);background:var(--scan-soft);
+  padding:6px 12px;border-radius:100px;letter-spacing:.02em}
+.eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--scan);box-shadow:0 0 0 3px rgba(21,188,104,.2)}
+h1{font-family:'Unbounded',sans-serif;font-weight:700;font-size:clamp(34px,5vw,56px);
+  line-height:1.04;letter-spacing:-.02em;margin:22px 0 0}
+h1 .hl{color:var(--scan)}
+.hero p.lead{font-size:18.5px;color:var(--slate);margin:22px 0 30px;max-width:30em}
+.hero-cta{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.btn-lg{padding:15px 26px;font-size:16px;border-radius:14px}
+.hero-note{display:flex;gap:18px;margin-top:26px;font-size:13.5px;color:var(--slate)}
+.hero-note span{display:flex;align-items:center;gap:7px}
+.tick{color:var(--scan);font-weight:700}
+
+/* analyzed photo card (hero + notifications) */
+.shot{position:relative;border-radius:20px;overflow:hidden;background:#0E1116;
+  box-shadow:0 30px 60px -30px rgba(14,17,22,.45);border:1px solid rgba(255,255,255,.06)}
+.shot .scene{display:block;width:100%;height:auto}
+.shot-bar{position:absolute;left:14px;right:14px;bottom:14px;display:flex;align-items:center;
+  justify-content:space-between;gap:10px;background:rgba(8,10,13,.72);backdrop-filter:blur(8px);
+  border:1px solid rgba(255,255,255,.1);border-radius:13px;padding:11px 14px}
+.verdict{display:flex;align-items:center;gap:9px;color:#fff;font-weight:600;font-size:14.5px}
+.verdict .ico{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;font-size:14px;font-weight:800}
+.verdict.bad .ico{background:var(--flag)}
+.verdict.good .ico{background:var(--scan)}
+.shot-meta{font-family:'JetBrains Mono',monospace;font-size:11px;color:rgba(255,255,255,.6);text-align:right;line-height:1.3}
+/* corner brackets */
+.brk{position:relative}
+.brk::before,.brk::after{content:"";position:absolute;width:18px;height:18px;pointer-events:none}
+.brk::before{top:-1px;left:-1px;border-top:2px solid var(--scan);border-left:2px solid var(--scan);border-top-left-radius:5px}
+.brk::after{bottom:-1px;right:-1px;border-bottom:2px solid var(--scan);border-right:2px solid var(--scan);border-bottom-right-radius:5px}
+
+/* scanline */
+.scanline{position:absolute;left:0;right:0;height:32%;top:-40%;
+  background:linear-gradient(180deg,transparent,rgba(21,188,104,.28),transparent);
+  animation:scan 4.5s ease-in-out infinite}
+@keyframes scan{0%{top:-40%}55%{top:108%}100%{top:108%}}
+
+/* ---------- section frame ---------- */
+section{padding:96px 0;position:relative}
+.kicker{font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:500;
+  color:var(--scan);letter-spacing:.06em;text-transform:uppercase}
+.sec-title{font-family:'Unbounded',sans-serif;font-weight:600;font-size:clamp(26px,3.6vw,40px);
+  letter-spacing:-.02em;margin:14px 0 0;line-height:1.1;max-width:18em}
+.sec-sub{font-size:17px;color:var(--slate);margin-top:16px;max-width:42em}
+
+/* ---------- how it works (dark) ---------- */
+.dark{background:var(--ink);color:#fff}
+.dark .sec-sub{color:rgba(255,255,255,.62)}
+.dark .kicker{color:#5EE49B}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:54px}
+.step{background:var(--ink-2);border:1px solid rgba(255,255,255,.08);border-radius:18px;
+  padding:28px 26px 26px;position:relative;overflow:hidden}
+.step .num{font-family:'JetBrains Mono',monospace;font-size:13px;color:#5EE49B;font-weight:700}
+.step h3{font-family:'Unbounded';font-weight:500;font-size:19px;margin:18px 0 10px;letter-spacing:-.01em}
+.step p{color:rgba(255,255,255,.62);font-size:15px}
+.step .glyph{position:absolute;right:-14px;top:-14px;font-size:120px;opacity:.05;font-family:'Unbounded';font-weight:800}
+.flow-arrow{display:none}
+
+/* ---------- features ---------- */
+.feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:54px}
+.feat{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:26px 24px;
+  transition:transform .2s,box-shadow .2s;position:relative}
+.feat:hover{transform:translateY(-4px);box-shadow:0 22px 40px -26px rgba(14,17,22,.3)}
+.feat .ic{width:46px;height:46px;border-radius:12px;display:grid;place-items:center;margin-bottom:18px;
+  background:var(--scan-soft)}
+.feat .ic svg{width:24px;height:24px;stroke:var(--scan);fill:none;stroke-width:1.9}
+.feat h3{font-size:18px;font-weight:700;letter-spacing:-.01em;margin-bottom:8px}
+.feat p{font-size:14.5px;color:var(--slate)}
+.feat .tag{position:absolute;top:18px;right:18px;font-family:'JetBrains Mono',monospace;
+  font-size:10.5px;color:var(--slate);opacity:.55}
+
+/* ---------- screenshots / chat mockups ---------- */
+.chats{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;margin-top:54px;align-items:start}
+.chat-col h3{font-family:'Unbounded';font-weight:500;font-size:17px;letter-spacing:-.01em;margin-bottom:6px}
+.chat-col .cap{font-size:14px;color:var(--slate);margin-bottom:18px;min-height:40px}
+.phone{border:1px solid var(--line);border-radius:24px;background:#fff;overflow:hidden;
+  box-shadow:0 24px 50px -30px rgba(14,17,22,.4)}
+.ph-head{display:flex;align-items:center;gap:11px;padding:13px 16px;border-bottom:1px solid var(--line);
+  background:#fff}
+.ph-head .back{color:var(--vk);font-size:20px;line-height:1}
+.ph-av{width:34px;height:34px;border-radius:50%;overflow:hidden;flex:none;background:#fff;display:grid;place-items:center}
+.ph-name{font-weight:700;font-size:14.5px;line-height:1.15}
+.ph-name small{display:block;font-weight:500;font-size:11.5px;color:var(--scan)}
+.ph-body{padding:16px 14px;display:flex;flex-direction:column;gap:9px;background:#F4F6F8;min-height:200px}
+.bub{max-width:84%;padding:10px 13px;border-radius:16px;font-size:13.5px;line-height:1.45;white-space:pre-line}
+.bub.in{background:#fff;color:var(--ink);border-bottom-left-radius:5px;align-self:flex-start;
+  box-shadow:0 1px 2px rgba(14,17,22,.06)}
+.bub.out{background:var(--vk);color:#fff;border-bottom-right-radius:5px;align-self:flex-end}
+.bub b{font-weight:700}
+.kbd{display:flex;flex-direction:column;gap:7px;margin-top:2px}
+.kbd-row{display:flex;gap:7px}
+.kbtn{flex:1;text-align:center;padding:9px 10px;border-radius:11px;font-size:12.5px;font-weight:600;
+  border:1.5px solid var(--vk);color:var(--vk);background:#fff}
+.kbtn.prim{background:var(--vk);color:#fff;border-color:var(--vk)}
+.kbtn.green{border-color:var(--scan);color:var(--scan)}
+.thumbs{display:flex;gap:6px;align-self:flex-start}
+.thumb{width:54px;height:54px;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
+.thumb svg{width:100%;height:100%;display:block}
+.notif{align-self:flex-start;max-width:90%;background:#fff;border-radius:16px;border-bottom-left-radius:5px;
+  overflow:hidden;box-shadow:0 1px 2px rgba(14,17,22,.06)}
+.notif .ph-shot{display:block;width:100%}
+.notif .txt{padding:11px 13px;font-size:13px;line-height:1.45;white-space:pre-line}
+.notif .hd{font-weight:700;display:flex;align-items:center;gap:7px;margin-bottom:5px}
+.pill{font-family:'JetBrains Mono',monospace;font-size:10px;padding:2px 7px;border-radius:6px;font-weight:700}
+.pill.bad{background:var(--flag-soft);color:var(--flag)}
+.pill.good{background:var(--scan-soft);color:var(--scan)}
+
+/* ---------- audience ---------- */
+.aud{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:54px}
+.aud-card{border-radius:20px;padding:34px 32px;border:1px solid var(--line);position:relative;overflow:hidden}
+.aud-card.uk{background:var(--ink);color:#fff}
+.aud-card.dv{background:var(--card)}
+.aud-card .role{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.04em;
+  text-transform:uppercase;opacity:.7}
+.aud-card.uk .role{color:#5EE49B;opacity:1}
+.aud-card.dv .role{color:var(--scan)}
+.aud-card h3{font-family:'Unbounded';font-weight:500;font-size:24px;margin:12px 0 18px;letter-spacing:-.01em}
+.aud-list{list-style:none;display:flex;flex-direction:column;gap:13px}
+.aud-list li{display:flex;gap:12px;font-size:15px;align-items:flex-start}
+.aud-list .n{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:13px;flex:none;
+  width:24px;height:24px;border-radius:7px;display:grid;place-items:center;margin-top:1px}
+.aud-card.uk .aud-list .n{background:rgba(94,228,155,.16);color:#5EE49B}
+.aud-card.dv .aud-list .n{background:var(--scan-soft);color:var(--scan)}
+.aud-card.uk .aud-list li{color:rgba(255,255,255,.82)}
+
+/* ---------- privacy strip ---------- */
+.priv{display:grid;grid-template-columns:auto 1fr auto;gap:26px;align-items:center;
+  background:var(--card);border:1px solid var(--line);border-radius:20px;padding:30px 34px}
+.priv .shield{width:56px;height:56px;border-radius:14px;background:var(--scan-soft);display:grid;place-items:center;flex:none}
+.priv .shield svg{width:28px;height:28px;stroke:var(--scan);fill:none;stroke-width:1.8}
+.priv h3{font-size:19px;font-weight:700;margin-bottom:6px;letter-spacing:-.01em}
+.priv p{font-size:14.5px;color:var(--slate);max-width:46em}
+.priv a.link{color:var(--vk);font-weight:600;white-space:nowrap}
+
+/* ---------- final cta ---------- */
+.cta-final{background:var(--ink);color:#fff;border-radius:28px;padding:64px;text-align:center;position:relative;overflow:hidden}
+.cta-final::before{content:"";position:absolute;inset:0;
+  background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);
+  background-size:48px 48px;-webkit-mask-image:radial-gradient(circle at 50% 50%,#000,transparent 75%);mask-image:radial-gradient(circle at 50% 50%,#000,transparent 75%)}
+.cta-final .inner{position:relative}
+.cta-final h2{font-family:'Unbounded';font-weight:600;font-size:clamp(26px,3.6vw,40px);letter-spacing:-.02em;line-height:1.1}
+.cta-final p{color:rgba(255,255,255,.66);font-size:18px;margin:18px auto 32px;max-width:34em}
+.cta-final .scan-chip{display:inline-flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;
+  font-size:12px;color:#5EE49B;background:rgba(94,228,155,.12);padding:6px 13px;border-radius:100px;margin-bottom:8px}
+
+/* ---------- footer ---------- */
+footer{padding:48px 0 56px;border-top:1px solid var(--line)}
+.foot{display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap}
+.foot-links{display:flex;gap:26px;font-size:14px;color:var(--slate)}
+.foot-links a:hover{color:var(--ink)}
+.foot .mono{font-size:12px;color:var(--slate)}
+
+/* reveal */
+.rev{opacity:0;transform:translateY(22px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+.rev.show{opacity:1;transform:none}
+
+/* responsive */
+@media(max-width:960px){
+  .hero-grid{grid-template-columns:1fr;gap:40px}
+  .steps,.feat-grid,.chats{grid-template-columns:1fr}
+  .aud{grid-template-columns:1fr}
+  .nav-links a:not(.btn){display:none}
+  .priv{grid-template-columns:1fr;text-align:left}
+  .chats{max-width:400px;margin-left:auto;margin-right:auto}
+}
+@media(max-width:640px){
+  section{padding:72px 0}
+  .cta-final{padding:44px 22px}
+  .hero{padding:56px 0 48px}
+}
+@media(prefers-reduced-motion:reduce){
+  .scanline{display:none}
+  .rev{opacity:1;transform:none;transition:none}
+  html{scroll-behavior:auto}
+}
+:focus-visible{outline:3px solid var(--vk);outline-offset:3px;border-radius:6px}
+</style>
+</head>
+<body>
+
+<!-- ============ NAV ============ -->
+<nav>
+  <div class="wrap nav-in">
+    <a class="logo" href="#top">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="28" height="28" style="flex:none">
+        <defs><clipPath id="logo-lens-nav"><circle cx="262" cy="236" r="128"/></clipPath></defs>
+        <line x1="160" y1="334" x2="80" y2="414" stroke="#F2A14B" stroke-width="38" stroke-linecap="round"/>
+        <circle cx="262" cy="236" r="150" fill="#F2A14B"/>
+        <circle cx="262" cy="236" r="128" fill="#EAF1F8"/>
+        <g clip-path="url(#logo-lens-nav)">
+          <g transform="translate(-26.2 -23.6) scale(1.1)">
+            <path d="M232,178 C264,174 290,194 300,232 C306,248 306,262 298,274 C284,298 256,302 238,298 C210,292 194,270 192,240 C190,212 204,190 232,178 Z" fill="#2B5C8A"/>
+            <path d="M296,230 C320,230 342,238 358,250 C342,262 316,266 296,260 C299,250 297,238 296,230 Z" fill="#F2A14B"/>
+            <ellipse cx="300" cy="228" rx="11" ry="7" transform="rotate(-18 300 228)" fill="#FFFFFF"/>
+            <circle cx="268" cy="222" r="17" fill="#F2A14B"/>
+            <circle cx="268" cy="222" r="10" fill="#15243B"/>
+            <circle cx="272" cy="218" r="3.6" fill="#FFFFFF"/>
+          </g>
+        </g>
+      </svg>
+      RubbishDetector<small>/bot</small>
+    </a>
+    <div class="nav-links">
+      <a href="#how">Как работает</a>
+      <a href="#features">Возможности</a>
+      <a href="#demo">Примеры</a>
+      <a href="https://vk.me/rubbish_detector" class="btn btn-vk"><span class="vk-glyph">VK</span> Открыть бота</a>
+    </div>
+  </div>
+</nav>
+
+<main id="top">
+
+<!-- ============ HERO ============ -->
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div class="rev show">
+      <span class="eyebrow"><span class="dot"></span>КОМПЬЮТЕРНОЕ ЗРЕНИЕ · VK</span>
+      <h1>Чистоту двора теперь проверяет <span class="hl">нейросеть</span></h1>
+      <p class="lead">VK-бот, который по фото от дворников сам находит мусор и присылает управляющей компании готовый вердикт. Без приложений и бумажных отчётов — прямо в личных сообщениях.</p>
+      <div class="hero-cta">
+        <a href="https://vk.me/rubbish_detector" class="btn btn-vk btn-lg"><span class="vk-glyph">VK</span> Открыть бота в VK</a>
+        <a href="#how" class="btn btn-ghost btn-lg">Как это работает</a>
+      </div>
+      <div class="hero-note">
+        <span><span class="tick">✓</span> Ничего не нужно устанавливать</span>
+        <span><span class="tick">✓</span> Уведомления за секунды</span>
+      </div>
+    </div>
+
+    <!-- analyzed photo: dirty -->
+    <div class="rev show">
+      <div class="shot brk">
+        <div class="scanline"></div>
+        <!-- courtyard scene WITH trash + boxes -->
+        <svg class="scene" viewBox="0 0 520 380" xmlns="http://www.w3.org/2000/svg">
+          <defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#1B2530"/><stop offset="1" stop-color="#243040"/></linearGradient></defs>
+          <rect width="520" height="380" fill="url(#sky)"/>
+          <!-- building -->
+          <rect x="0" y="40" width="520" height="150" fill="#2B3340"/>
+          <g fill="#3A4452">
+            <rect x="30" y="62" width="34" height="40"/><rect x="84" y="62" width="34" height="40"/>
+            <rect x="138" y="62" width="34" height="40"/><rect x="192" y="62" width="34" height="40"/>
+            <rect x="300" y="62" width="34" height="40"/><rect x="354" y="62" width="34" height="40"/>
+            <rect x="408" y="62" width="34" height="40"/><rect x="462" y="62" width="34" height="40"/>
+            <rect x="30" y="118" width="34" height="40"/><rect x="84" y="118" width="34" height="40"/>
+            <rect x="138" y="118" width="34" height="40"/><rect x="300" y="118" width="34" height="40"/>
+            <rect x="408" y="118" width="34" height="40"/><rect x="462" y="118" width="34" height="40"/>
+          </g>
+          <!-- ground -->
+          <rect x="0" y="190" width="520" height="190" fill="#5B6470"/>
+          <rect x="0" y="190" width="520" height="14" fill="#6B7480"/>
+          <!-- pavement seams -->
+          <g stroke="#4C545E" stroke-width="2">
+            <line x1="130" y1="204" x2="60" y2="380"/><line x1="260" y1="204" x2="250" y2="380"/>
+            <line x1="390" y1="204" x2="440" y2="380"/></g>
+          <!-- bin -->
+          <rect x="240" y="150" width="42" height="46" rx="4" fill="#2E7D46"/>
+          <rect x="236" y="146" width="50" height="8" rx="3" fill="#256138"/>
+          <!-- trash items -->
+          <g>
+            <ellipse cx="120" cy="300" rx="20" ry="8" fill="#C9CDD2"/><rect x="112" y="284" width="16" height="18" rx="3" fill="#E2E6EA"/>
+            <ellipse cx="330" cy="330" rx="16" ry="6" fill="#D8A24A"/>
+            <rect x="408" y="252" width="22" height="10" rx="4" fill="#C0454A"/>
+            <circle cx="200" cy="345" r="9" fill="#B9BEC4"/>
+          </g>
+          <!-- detection boxes -->
+          <g fill="none" stroke="#FF5247" stroke-width="2.5">
+            <rect x="98" y="276" width="48" height="36" rx="2"/>
+            <rect x="312" y="316" width="40" height="26" rx="2"/>
+            <rect x="398" y="244" width="42" height="26" rx="2"/>
+          </g>
+          <g font-family="JetBrains Mono, monospace" font-size="9" font-weight="700" fill="#fff">
+            <rect x="98" y="265" width="74" height="13" fill="#FF5247"/><text x="101" y="274">МУСОР 0.91</text>
+            <rect x="312" y="305" width="74" height="13" fill="#FF5247"/><text x="315" y="314">МУСОР 0.84</text>
+            <rect x="398" y="233" width="74" height="13" fill="#FF5247"/><text x="401" y="242">МУСОР 0.78</text>
+          </g>
+        </svg>
+        <div class="shot-bar">
+          <div class="verdict bad"><span class="ico">✕</span> Обнаружен мусор · 3 объекта</div>
+          <div class="shot-meta">model: 5-class<br>conf ≥ 0.25</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ HOW IT WORKS ============ -->
+<section id="how" class="dark">
+  <div class="wrap">
+    <div class="rev">
+      <span class="kicker">Как это работает</span>
+      <h2 class="sec-title">Три шага — от фото во дворе до вердикта у диспетчера</h2>
+      <p class="sec-sub">Дворник не ставит приложение и не заполняет форму. Вся работа — это одно сообщение в VK с фотографиями.</p>
+    </div>
+    <div class="steps">
+      <div class="step rev">
+        <span class="glyph">01</span>
+        <span class="num">ШАГ 01 · ДВОРНИК</span>
+        <h3>Отправляет фото</h3>
+        <p>Сотрудник присылает боту 1–10 снимков убранного участка. Можно добавить комментарий — адрес или номер участка.</p>
+      </div>
+      <div class="step rev">
+        <span class="glyph">02</span>
+        <span class="num">ШАГ 02 · НЕЙРОСЕТЬ</span>
+        <h3>Анализирует снимки</h3>
+        <p>Компьютерное зрение проверяет каждое фото и отмечает рамкой найденный мусор. Оригинал и размеченный кадр сохраняются.</p>
+      </div>
+      <div class="step rev">
+        <span class="glyph">03</span>
+        <span class="num">ШАГ 03 · УК</span>
+        <h3>Получает уведомление</h3>
+        <p>Управляющая компания мгновенно получает сообщение с вердиктом ✅/❌ и размеченными фотографиями. Автоматически.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FEATURES ============ -->
+<section id="features">
+  <div class="wrap">
+    <div class="rev">
+      <span class="kicker">Возможности</span>
+      <h2 class="sec-title">Почему это удобнее ручных проверок</h2>
+    </div>
+    <div class="feat-grid">
+      <div class="feat rev">
+        <span class="tag">[ VK ]</span>
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+        <h3>Работает прямо в VK</h3>
+        <p>Никаких установок и логинов. Дворник отправляет фото в личные сообщения сообщества — как обычному собеседнику.</p>
+      </div>
+      <div class="feat rev">
+        <span class="tag">[ AI ]</span>
+        <div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/></svg></div>
+        <h3>Объективная проверка</h3>
+        <p>Мусор находит компьютерное зрение, а не человек. Один и тот же стандарт применяется к каждому участку и каждой смене.</p>
+      </div>
+      <div class="feat rev">
+        <span class="tag">[ BOX ]</span>
+        <div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6v6H9z"/></svg></div>
+        <h3>Размеченные фото</h3>
+        <p>На снимке видно, где именно остался мусор: красная рамка вокруг каждого объекта. Спорить не о чем.</p>
+      </div>
+      <div class="feat rev">
+        <span class="tag">[ ⚡ ]</span>
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-2 8 9-12h-7z"/></svg></div>
+        <h3>Мгновенные уведомления</h3>
+        <p>УК узнаёт результат сразу после отправки отчёта — и по чистым участкам тоже. Контроль не зависит от смены диспетчера.</p>
+      </div>
+      <div class="feat rev">
+        <span class="tag">[ CODE ]</span>
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M7 7h10v10H7z"/><path d="M3 12h2M19 12h2M12 3v2M12 19v2"/></svg></div>
+        <h3>Регистрация по коду</h3>
+        <p>Компания получает один код подключения и раздаёт его сотрудникам. Ввёл код — и можно слать отчёты.</p>
+      </div>
+      <div class="feat rev">
+        <span class="tag">[ FAIR ]</span>
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3v18M5 8l7-5 7 5M5 8l-2 6a4 4 0 0 0 8 0L5 8zM19 8l-2 6a4 4 0 0 0 8 0L19 8z"/></svg></div>
+        <h3>Честная оценка</h3>
+        <p>Дворник всегда получает одинаковый ответ «Отчёт принят» — он не знает, нашёл бот мусор или нет. Подстроиться нельзя.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ DEMO / SCREENSHOTS ============ -->
+<section id="demo" style="background:linear-gradient(180deg,#fff,var(--paper))">
+  <div class="wrap">
+    <div class="rev">
+      <span class="kicker">Как это выглядит</span>
+      <h2 class="sec-title">Весь сервис — в одном диалоге VK</h2>
+      <p class="sec-sub">Три реальных сценария: подключение сотрудника, отправка отчёта и уведомление управляющей компании.</p>
+    </div>
+
+    <div class="chats">
+
+      <!-- 1. Registration -->
+      <div class="chat-col rev">
+        <h3>1 · Подключение сотрудника</h3>
+        <p class="cap">Дворник выбирает роль и вводит код, который выдала УК.</p>
+        <div class="phone">
+          <div class="ph-head">
+            <span class="back">‹</span>
+            <span class="ph-av">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="34" height="34">
+                <defs><clipPath id="av-lens-1"><circle cx="262" cy="236" r="128"/></clipPath></defs>
+                <line x1="160" y1="334" x2="80" y2="414" stroke="#F2A14B" stroke-width="38" stroke-linecap="round"/>
+                <circle cx="262" cy="236" r="150" fill="#F2A14B"/>
+                <circle cx="262" cy="236" r="128" fill="#EAF1F8"/>
+                <g clip-path="url(#av-lens-1)">
+                  <g transform="translate(-26.2 -23.6) scale(1.1)">
+                    <path d="M232,178 C264,174 290,194 300,232 C306,248 306,262 298,274 C284,298 256,302 238,298 C210,292 194,270 192,240 C190,212 204,190 232,178 Z" fill="#2B5C8A"/>
+                    <path d="M296,230 C320,230 342,238 358,250 C342,262 316,266 296,260 C299,250 297,238 296,230 Z" fill="#F2A14B"/>
+                    <ellipse cx="300" cy="228" rx="11" ry="7" transform="rotate(-18 300 228)" fill="#FFFFFF"/>
+                    <circle cx="268" cy="222" r="17" fill="#F2A14B"/>
+                    <circle cx="268" cy="222" r="10" fill="#15243B"/>
+                    <circle cx="272" cy="218" r="3.6" fill="#FFFFFF"/>
+                  </g>
+                </g>
+              </svg>
+            </span>
+            <span class="ph-name">RubbishDetector<small>онлайн</small></span>
+          </div>
+          <div class="ph-body">
+            <div class="bub in">Здравствуйте! Я бот RubbishDetector — автоматический контроль уборки территорий. Кто вы?</div>
+            <div class="kbd">
+              <div class="kbd-row"><span class="kbtn">Управляющая компания</span></div>
+              <div class="kbd-row"><span class="kbtn">Сотрудник по уборке</span></div>
+            </div>
+            <div class="bub in">Введите регистрационный код, который вам выдала управляющая компания.</div>
+            <div class="bub out">ABC123</div>
+            <div class="bub in">Вы регистрируетесь в компании «Чистый двор». Подтвердите, что ознакомлены: фото сохраняются и могут использоваться для обучения модели.</div>
+            <div class="kbd">
+              <div class="kbd-row"><span class="kbtn green">Принимаю</span><span class="kbtn">Отмена</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Report -->
+      <div class="chat-col rev">
+        <h3>2 · Отправка отчёта</h3>
+        <p class="cap">Дворник присылает фото — бот принимает их и обрабатывает в фоне.</p>
+        <div class="phone">
+          <div class="ph-head">
+            <span class="back">‹</span>
+            <span class="ph-av">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="34" height="34">
+                <defs><clipPath id="av-lens-2"><circle cx="262" cy="236" r="128"/></clipPath></defs>
+                <line x1="160" y1="334" x2="80" y2="414" stroke="#F2A14B" stroke-width="38" stroke-linecap="round"/>
+                <circle cx="262" cy="236" r="150" fill="#F2A14B"/>
+                <circle cx="262" cy="236" r="128" fill="#EAF1F8"/>
+                <g clip-path="url(#av-lens-2)">
+                  <g transform="translate(-26.2 -23.6) scale(1.1)">
+                    <path d="M232,178 C264,174 290,194 300,232 C306,248 306,262 298,274 C284,298 256,302 238,298 C210,292 194,270 192,240 C190,212 204,190 232,178 Z" fill="#2B5C8A"/>
+                    <path d="M296,230 C320,230 342,238 358,250 C342,262 316,266 296,260 C299,250 297,238 296,230 Z" fill="#F2A14B"/>
+                    <ellipse cx="300" cy="228" rx="11" ry="7" transform="rotate(-18 300 228)" fill="#FFFFFF"/>
+                    <circle cx="268" cy="222" r="17" fill="#F2A14B"/>
+                    <circle cx="268" cy="222" r="10" fill="#15243B"/>
+                    <circle cx="272" cy="218" r="3.6" fill="#FFFFFF"/>
+                  </g>
+                </g>
+              </svg>
+            </span>
+            <span class="ph-name">RubbishDetector<small>онлайн</small></span>
+          </div>
+          <div class="ph-body">
+            <div class="bub in">Для отправки отчёта пришлите фото убранного участка. Можно добавить комментарий.</div>
+            <div class="thumbs">
+              <div class="thumb"><svg viewBox="0 0 60 60"><rect width="60" height="60" fill="#5B6470"/><rect y="0" width="60" height="26" fill="#2B3340"/><circle cx="20" cy="44" r="5" fill="#C9CDD2"/></svg></div>
+              <div class="thumb"><svg viewBox="0 0 60 60"><rect width="60" height="60" fill="#5B6470"/><rect y="0" width="60" height="26" fill="#2B3340"/><rect x="36" y="40" width="12" height="6" fill="#D8A24A"/></svg></div>
+            </div>
+            <div class="bub out">Двор у д.14, утро ✅</div>
+            <div class="bub in">Фото получены, обрабатываю…</div>
+            <div class="bub in"><b>Отчёт принят.</b> Спасибо что делаете наш город чище!
+
+📎 Напоминаем: фото сохраняются и могут использоваться для улучшения системы распознавания.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Notification to UK -->
+      <div class="chat-col rev">
+        <h3>3 · Уведомление УК</h3>
+        <p class="cap">Управляющая компания получает результат с размеченным фото — автоматически.</p>
+        <div class="phone">
+          <div class="ph-head">
+            <span class="back">‹</span>
+            <span class="ph-av">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="34" height="34">
+                <defs><clipPath id="av-lens-3"><circle cx="262" cy="236" r="128"/></clipPath></defs>
+                <line x1="160" y1="334" x2="80" y2="414" stroke="#F2A14B" stroke-width="38" stroke-linecap="round"/>
+                <circle cx="262" cy="236" r="150" fill="#F2A14B"/>
+                <circle cx="262" cy="236" r="128" fill="#EAF1F8"/>
+                <g clip-path="url(#av-lens-3)">
+                  <g transform="translate(-26.2 -23.6) scale(1.1)">
+                    <path d="M232,178 C264,174 290,194 300,232 C306,248 306,262 298,274 C284,298 256,302 238,298 C210,292 194,270 192,240 C190,212 204,190 232,178 Z" fill="#2B5C8A"/>
+                    <path d="M296,230 C320,230 342,238 358,250 C342,262 316,266 296,260 C299,250 297,238 296,230 Z" fill="#F2A14B"/>
+                    <ellipse cx="300" cy="228" rx="11" ry="7" transform="rotate(-18 300 228)" fill="#FFFFFF"/>
+                    <circle cx="268" cy="222" r="17" fill="#F2A14B"/>
+                    <circle cx="268" cy="222" r="10" fill="#15243B"/>
+                    <circle cx="272" cy="218" r="3.6" fill="#FFFFFF"/>
+                  </g>
+                </g>
+              </svg>
+            </span>
+            <span class="ph-name">RubbishDetector<small>онлайн</small></span>
+          </div>
+          <div class="ph-body">
+            <!-- dirty notification -->
+            <div class="notif">
+              <svg class="ph-shot" viewBox="0 0 300 150" xmlns="http://www.w3.org/2000/svg">
+                <rect width="300" height="150" fill="#243040"/>
+                <rect x="0" y="20" width="300" height="58" fill="#2B3340"/>
+                <rect x="0" y="78" width="300" height="72" fill="#5B6470"/>
+                <rect x="138" y="58" width="26" height="20" rx="3" fill="#2E7D46"/>
+                <rect x="62" y="106" width="14" height="14" rx="3" fill="#E2E6EA"/>
+                <rect x="226" y="98" width="16" height="8" rx="3" fill="#D8A24A"/>
+                <g fill="none" stroke="#FF5247" stroke-width="2.5">
+                  <rect x="56" y="100" width="28" height="26" rx="2"/>
+                  <rect x="220" y="92" width="30" height="20" rx="2"/>
+                </g>
+                <g font-family="JetBrains Mono, monospace" font-size="7" font-weight="700" fill="#fff">
+                  <rect x="56" y="92" width="52" height="9" fill="#FF5247"/><text x="58" y="99">МУСОР 0.90</text>
+                  <rect x="220" y="84" width="52" height="9" fill="#FF5247"/><text x="222" y="91">МУСОР 0.81</text>
+                </g>
+              </svg>
+              <div class="txt"><div class="hd"><span class="pill bad">❌ МУСОР</span> Отчёт от дворника</div>И. Петров · сегодня 09:14
+Комментарий: Двор у д.14
+<b>Обнаружен мусор: 2 объекта на 1 фото.</b></div>
+            </div>
+            <!-- clean notification -->
+            <div class="notif">
+              <svg class="ph-shot" viewBox="0 0 300 110" xmlns="http://www.w3.org/2000/svg">
+                <rect width="300" height="110" fill="#243040"/>
+                <rect x="0" y="16" width="300" height="44" fill="#2B3340"/>
+                <rect x="0" y="60" width="300" height="50" fill="#5B6470"/>
+                <rect x="0" y="60" width="300" height="6" fill="#6B7480"/>
+              </svg>
+              <div class="txt"><div class="hd"><span class="pill good">✅ ЧИСТО</span> Отчёт от дворника</div>И. Петров · сегодня 14:02
+<b>После уборки мусора не обнаружено.</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============ AUDIENCE ============ -->
+<section>
+  <div class="wrap">
+    <div class="rev">
+      <span class="kicker">Для кого</span>
+      <h2 class="sec-title">Две роли — один бот</h2>
+    </div>
+    <div class="aud">
+      <div class="aud-card uk rev">
+        <span class="role">Управляющая компания</span>
+        <h3>Контроль без ручных проверок</h3>
+        <ul class="aud-list">
+          <li><span class="n">1</span> Регистрируете компанию в боте и получаете код подключения.</li>
+          <li><span class="n">2</span> Раздаёте код своим сотрудникам по уборке.</li>
+          <li><span class="n">3</span> Получаете уведомления о каждом отчёте — с фото и вердиктом.</li>
+          <li><span class="n">4</span> Видите результат и по чистым, и по грязным участкам.</li>
+        </ul>
+      </div>
+      <div class="aud-card dv rev">
+        <span class="role">Сотрудник по уборке</span>
+        <h3>Отчёт за пару касаний</h3>
+        <ul class="aud-list">
+          <li><span class="n">1</span> Вводите код от управляющей компании один раз.</li>
+          <li><span class="n">2</span> Отправляете фото убранного участка в чат.</li>
+          <li><span class="n">3</span> Получаете подтверждение «Отчёт принят» — и всё.</li>
+          <li><span class="n">4</span> Никаких приложений, форм и личных кабинетов.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PRIVACY ============ -->
+<section style="padding-top:0">
+  <div class="wrap">
+    <div class="priv rev">
+      <div class="shield"><svg viewBox="0 0 24 24"><path d="M12 2 4 6v6c0 5 3.5 8 8 10 4.5-2 8-5 8-10V6z"/><path d="m9 12 2 2 4-4"/></svg></div>
+      <div>
+        <h3>Данные хранятся в России</h3>
+        <p>Фотографии, загруженные через бота, сохраняются в защищённом облачном хранилище на территории РФ с ограниченным сроком хранения. Сотрудник и управляющая компания подтверждают согласие на обработку данных при регистрации.</p>
+      </div>
+      <a href="/privacy" class="link">Политика конфиденциальности →</a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FINAL CTA ============ -->
+<section style="padding-top:0">
+  <div class="wrap">
+    <div class="cta-final rev">
+      <div class="inner">
+        <span class="scan-chip"><span class="dot" style="width:7px;height:7px;border-radius:50%;background:#5EE49B;display:inline-block"></span> ГОТОВ К РАБОТЕ</span>
+        <h2>Наведите порядок в контроле уборки</h2>
+        <p>Подключите управляющую компанию за пару минут и начните получать объективные отчёты уже сегодня.</p>
+        <a href="https://vk.me/rubbish_detector" class="btn btn-vk btn-lg"><span class="vk-glyph">VK</span> Открыть бота в VK</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ============ FOOTER ============ -->
+<footer>
+  <div class="wrap foot">
+    <a class="logo" href="#top">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="28" height="28" style="flex:none">
+        <defs><clipPath id="logo-lens-foot"><circle cx="262" cy="236" r="128"/></clipPath></defs>
+        <line x1="160" y1="334" x2="80" y2="414" stroke="#F2A14B" stroke-width="38" stroke-linecap="round"/>
+        <circle cx="262" cy="236" r="150" fill="#F2A14B"/>
+        <circle cx="262" cy="236" r="128" fill="#EAF1F8"/>
+        <g clip-path="url(#logo-lens-foot)">
+          <g transform="translate(-26.2 -23.6) scale(1.1)">
+            <path d="M232,178 C264,174 290,194 300,232 C306,248 306,262 298,274 C284,298 256,302 238,298 C210,292 194,270 192,240 C190,212 204,190 232,178 Z" fill="#2B5C8A"/>
+            <path d="M296,230 C320,230 342,238 358,250 C342,262 316,266 296,260 C299,250 297,238 296,230 Z" fill="#F2A14B"/>
+            <ellipse cx="300" cy="228" rx="11" ry="7" transform="rotate(-18 300 228)" fill="#FFFFFF"/>
+            <circle cx="268" cy="222" r="17" fill="#F2A14B"/>
+            <circle cx="268" cy="222" r="10" fill="#15243B"/>
+            <circle cx="272" cy="218" r="3.6" fill="#FFFFFF"/>
+          </g>
+        </g>
+      </svg>
+      RubbishDetector<small>/bot</small>
+    </a>
+    <div class="foot-links">
+      <a href="/">rubbish-detector.ru</a>
+      <a href="/privacy">Конфиденциальность</a>
+      <a href="https://vk.com/rubbish_detector">Сообщество VK</a>
+    </div>
+    <span class="mono">© 2026 · контроль уборки на нейросетях</span>
+  </div>
+</footer>
+
+<script>
+const io=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('show');io.unobserve(e.target)}})},{threshold:.12});
+document.querySelectorAll('.rev').forEach((el,i)=>{el.style.transitionDelay=(i%3*60)+'ms';io.observe(el)});
+</script>
+</body>
+</html>
