@@ -1,79 +1,299 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <title>Политика конфиденциальности</title>
-    <link rel="stylesheet" href="/static/style.css">
-    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Политика конфиденциальности — RubbishDetector</title>
+<link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;800&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0E1116;
+  --ink-2:#161B22;
+  --paper:#F6F7F4;
+  --card:#FFFFFF;
+  --scan:#15BC68;
+  --scan-soft:#E4F7EC;
+  --flag:#FF5247;
+  --flag-soft:#FFEAE8;
+  --vk:#2787F5;
+  --mist:#E4E7E1;
+  --slate:#5C6672;
+  --line:rgba(14,17,22,.10);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:'Manrope',sans-serif;
+  background:var(--paper);
+  color:var(--ink);
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+.mono{font-family:'JetBrains Mono',monospace}
+
+body::before{
+  content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:64px 64px;
+  -webkit-mask-image:radial-gradient(circle at 50% 0,#000,transparent 70%);
+          mask-image:radial-gradient(circle at 50% 0,#000,transparent 70%);
+  opacity:.5;
+}
+main,nav,footer{position:relative;z-index:1}
+
+/* ---------- nav ---------- */
+nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);
+  background:rgba(246,247,244,.78);border-bottom:1px solid var(--line)}
+.nav-in{display:flex;align-items:center;justify-content:space-between;height:64px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:-.01em}
+.logo small{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--slate);font-weight:500}
+.nav-links{display:flex;align-items:center;gap:28px}
+.nav-links a{font-size:14px;color:var(--slate);font-weight:500}
+.nav-links a:hover{color:var(--ink)}
+.btn{display:inline-flex;align-items:center;gap:9px;font-weight:600;border-radius:12px;
+  padding:11px 18px;font-size:14.5px;cursor:pointer;border:none;transition:transform .15s,box-shadow .15s,background .15s}
+.btn-ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+.btn-ghost:hover{background:#fff}
+.nav .btn{padding:9px 16px}
+
+/* ---------- page header ---------- */
+.priv-header{padding:72px 0 52px}
+.kicker{font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:500;
+  color:var(--scan);letter-spacing:.06em;text-transform:uppercase}
+.sec-title{font-family:'Unbounded',sans-serif;font-weight:600;font-size:clamp(26px,3.6vw,40px);
+  letter-spacing:-.02em;margin:14px 0 0;line-height:1.1}
+.sec-sub{font-size:17px;color:var(--slate);margin-top:16px;max-width:48em}
+
+/* ---------- privacy sections ---------- */
+.priv-content{padding-bottom:96px}
+.priv-grid{display:flex;flex-direction:column;gap:12px;margin-top:0}
+.priv-card{background:var(--card);border:1px solid var(--line);border-radius:18px;
+  padding:28px 32px;transition:box-shadow .2s}
+.priv-card:hover{box-shadow:0 16px 40px -28px rgba(14,17,22,.25)}
+.priv-card-head{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.priv-num{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--scan);
+  background:var(--scan-soft);padding:4px 10px;border-radius:8px;white-space:nowrap;flex:none}
+.priv-card h2{font-size:18px;font-weight:700;letter-spacing:-.01em}
+.priv-card p{color:var(--slate);font-size:15px;line-height:1.65;margin-top:10px}
+.priv-card p:first-of-type{margin-top:0}
+.priv-card p+p{margin-top:10px}
+.priv-card ul{margin-top:10px;padding-left:20px;color:var(--slate);font-size:15px;line-height:1.8}
+.priv-card strong{color:var(--ink);font-weight:700}
+.priv-card a{color:var(--vk);font-weight:600}
+.priv-card a:hover{text-decoration:underline}
+
+/* ---------- privacy strip (data storage) ---------- */
+.priv-strip{display:grid;grid-template-columns:auto 1fr;gap:22px;align-items:center;
+  background:var(--ink);color:#fff;border-radius:18px;padding:28px 32px;margin-top:12px}
+.priv-strip .shield{width:52px;height:52px;border-radius:13px;background:rgba(21,188,104,.16);
+  display:grid;place-items:center;flex:none}
+.priv-strip .shield svg{width:26px;height:26px;stroke:#5EE49B;fill:none;stroke-width:1.8}
+.priv-strip h2{font-size:18px;font-weight:700;letter-spacing:-.01em;color:#fff}
+.priv-strip p{color:rgba(255,255,255,.65);font-size:15px;line-height:1.65;margin-top:6px}
+.priv-strip strong{color:#fff}
+
+/* ---------- footer ---------- */
+footer{padding:48px 0 56px;border-top:1px solid var(--line)}
+.foot{display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap}
+.foot-links{display:flex;gap:26px;font-size:14px;color:var(--slate)}
+.foot-links a:hover{color:var(--ink)}
+.foot .mono{font-size:12px;color:var(--slate)}
+
+/* ---------- reveal ---------- */
+.rev{opacity:0;transform:translateY(22px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+.rev.show{opacity:1;transform:none}
+
+/* ---------- responsive ---------- */
+@media(max-width:960px){
+  .nav-links a:not(.btn){display:none}
+  .priv-strip{grid-template-columns:1fr}
+}
+@media(max-width:640px){
+  .priv-header{padding:52px 0 36px}
+  .priv-card{padding:22px 20px}
+}
+@media(prefers-reduced-motion:reduce){
+  .rev{opacity:1;transform:none;transition:none}
+  html{scroll-behavior:auto}
+}
+:focus-visible{outline:3px solid var(--vk);outline-offset:3px;border-radius:6px}
+</style>
 </head>
 <body>
-<div class="page">
-    <main class="card">
-        <div class="privacy-header">
-            <a class="upload" href="/"><span>← На главную</span></a>
 
-            <h1>Политика конфиденциальности</h1>
-            <p class="hint">
-                Как сервис Rubbish Detector обрабатывает загруженные изображения и персональные данные.
-            </p>
-        </div>
+<!-- ============ NAV ============ -->
+<nav>
+  <div class="wrap nav-in">
+    <a class="logo" href="/">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="28" height="28" style="flex:none">
+        <defs><clipPath id="logo-lens-nav"><circle cx="262" cy="236" r="128"/></clipPath></defs>
+        <line x1="160" y1="334" x2="80" y2="414" stroke="#F2A14B" stroke-width="38" stroke-linecap="round"/>
+        <circle cx="262" cy="236" r="150" fill="#F2A14B"/>
+        <circle cx="262" cy="236" r="128" fill="#EAF1F8"/>
+        <g clip-path="url(#logo-lens-nav)">
+          <g transform="translate(-26.2 -23.6) scale(1.1)">
+            <path d="M232,178 C264,174 290,194 300,232 C306,248 306,262 298,274 C284,298 256,302 238,298 C210,292 194,270 192,240 C190,212 204,190 232,178 Z" fill="#2B5C8A"/>
+            <path d="M296,230 C320,230 342,238 358,250 C342,262 316,266 296,260 C299,250 297,238 296,230 Z" fill="#F2A14B"/>
+            <ellipse cx="300" cy="228" rx="11" ry="7" transform="rotate(-18 300 228)" fill="#FFFFFF"/>
+            <circle cx="268" cy="222" r="17" fill="#F2A14B"/>
+            <circle cx="268" cy="222" r="10" fill="#15243B"/>
+            <circle cx="272" cy="218" r="3.6" fill="#FFFFFF"/>
+          </g>
+        </g>
+      </svg>
+      RubbishDetector
+    </a>
+    <div class="nav-links">
+      <a href="/">Проверить фото</a>
+      <a href="/bot">VK-бот</a>
+      <a href="/" class="btn btn-ghost">← На главную</a>
+    </div>
+  </div>
+</nav>
 
-        <section class="privacy-section">
-            <h2>1. Назначение сервиса</h2>
-            <p>Сервис предназначен для автоматического обнаружения объектов антропогенного загрязнения городской среды на изображениях с использованием нейронной сети. Сервис доступен через веб-интерфейс на сайте rubbish-detector.ru, а также через VK-бота для управляющих компаний и сотрудников по уборке территорий.</p>
-        </section>
+<main>
 
-        <section class="privacy-section">
-            <h2>2. Какие данные обрабатываются</h2>
-            <p><strong>Веб-интерфейс.</strong> Пользователь может загрузить изображение для анализа. Загруженное изображение используется только для поиска объектов загрязнения и формирования результата. Персональные данные не собираются.</p>
-            <p><strong>VK-бот.</strong> При регистрации и использовании бота обрабатываются:</p>
-            <ul>
-                <li>VK-идентификатор и имя профиля пользователя;</li>
-                <li>контактный телефон — при регистрации управляющей компании;</li>
-                <li>фотографии убранных территорий и текстовые комментарии — при отправке отчётов сотрудниками.</li>
-            </ul>
-        </section>
+<!-- ============ HEADER ============ -->
+<section class="priv-header">
+  <div class="wrap rev show">
+    <span class="kicker">Политика конфиденциальности</span>
+    <h1 class="sec-title">Как мы обрабатываем данные</h1>
+    <p class="sec-sub">Здесь описано, какие данные собирает сервис RubbishDetector, как они хранятся и используются — как через веб-интерфейс, так и через VK-бота.</p>
+  </div>
+</section>
 
-        <section class="privacy-section">
-            <h2>3. Хранение изображений</h2>
-            <p><strong>Веб-интерфейс (/api/detect, /api/detect-file).</strong> Загруженные изображения обрабатываются в момент запроса и не сохраняются. Они могут временно находиться в памяти сервера только на период обработки.</p>
-            <p><strong>VK-бот.</strong> Фотографии, отправленные сотрудниками через бота, сохраняются в защищённом облачном хранилище на территории Российской Федерации. Хранятся оригинальная версия фото и версия с разметкой результатов детекции. Срок хранения ограничен и определяется соглашением об обработке персональных данных, подписанным управляющей компанией.</p>
-        </section>
+<!-- ============ CONTENT ============ -->
+<section class="priv-content">
+  <div class="wrap priv-grid">
 
-        <section class="privacy-section">
-            <h2>4. Использование данных для обучения модели</h2>
-            <p>Фотографии территорий, загруженные сотрудниками через VK-бота, могут использоваться для дообучения и улучшения модели распознавания мусора.</p>
-            <p>Управляющая компания уведомляется об этом при регистрации и подтверждает согласие, заполняя и направляя форму на обработку персональных данных. Сотрудник уведомляется при регистрации и подтверждает ознакомление кнопкой «Принимаю» в диалоге с ботом.</p>
-        </section>
+    <div class="priv-card rev">
+      <div class="priv-card-head">
+        <span class="priv-num">01</span>
+        <h2>Назначение сервиса</h2>
+      </div>
+      <p>Сервис предназначен для автоматического обнаружения объектов антропогенного загрязнения городской среды на изображениях с использованием нейронной сети. Сервис доступен через веб-интерфейс на сайте rubbish-detector.ru, а также через VK-бота для управляющих компаний и сотрудников по уборке территорий.</p>
+    </div>
 
-        <section class="privacy-section">
-            <h2>5. Передача данных третьим лицам</h2>
-            <p>Сервис не передаёт персональные данные третьим лицам, за исключением следующего случая: результаты проверки (фотографии с разметкой и итог «чисто/грязно») автоматически отправляются контроллеру управляющей компании, к которой прикреплён сотрудник-дворник.</p>
-        </section>
+    <div class="priv-card rev">
+      <div class="priv-card-head">
+        <span class="priv-num">02</span>
+        <h2>Какие данные обрабатываются</h2>
+      </div>
+      <p><strong>Веб-интерфейс.</strong> Пользователь может загрузить изображение для анализа. Загруженное изображение используется только для поиска объектов загрязнения и формирования результата. Персональные данные не собираются.</p>
+      <p><strong>VK-бот.</strong> При регистрации и использовании бота обрабатываются:</p>
+      <ul>
+        <li>VK-идентификатор и имя профиля пользователя;</li>
+        <li>контактный телефон — при регистрации управляющей компании;</li>
+        <li>фотографии убранных территорий и текстовые комментарии — при отправке отчётов сотрудниками.</li>
+      </ul>
+    </div>
 
-        <section class="privacy-section">
-            <h2>6. Ответственность пользователя</h2>
-            <p>Пользователь самостоятельно несёт ответственность за содержание загружаемых изображений. Не допускается загрузка материалов, нарушающих законодательство или права третьих лиц.</p>
-        </section>
+    <div class="priv-strip rev">
+      <div class="shield">
+        <svg viewBox="0 0 24 24"><path d="M12 2 4 6v6c0 5 3.5 8 8 10 4.5-2 8-5 8-10V6z"/><path d="m9 12 2 2 4-4"/></svg>
+      </div>
+      <div>
+        <h2>Хранение изображений</h2>
+        <p><strong>Веб-интерфейс (/api/detect, /api/detect-file).</strong> Загруженные изображения обрабатываются в момент запроса и не сохраняются. Они могут временно находиться в памяти сервера только на период обработки.</p>
+        <p><strong>VK-бот.</strong> Фотографии, отправленные сотрудниками через бота, сохраняются в защищённом облачном хранилище на территории Российской Федерации. Хранятся оригинальная версия фото и версия с разметкой результатов детекции. Срок хранения определяется соглашением об обработке персональных данных, подписанным управляющей компанией.</p>
+      </div>
+    </div>
 
-        <section class="privacy-section">
-            <h2>7. Безопасность</h2>
-            <p>В сервисе применяются разумные технические меры защиты, однако абсолютная безопасность передачи данных через Интернет не может быть гарантирована.</p>
-        </section>
+    <div class="priv-card rev">
+      <div class="priv-card-head">
+        <span class="priv-num">04</span>
+        <h2>Использование данных для обучения модели</h2>
+      </div>
+      <p>Фотографии территорий, загруженные сотрудниками через VK-бота, могут использоваться для дообучения и улучшения модели распознавания мусора.</p>
+      <p>Управляющая компания уведомляется об этом при регистрации и подтверждает согласие, заполняя и направляя форму на обработку персональных данных. Сотрудник уведомляется при регистрации и подтверждает ознакомление кнопкой «Принимаю» в диалоге с ботом.</p>
+    </div>
 
-        <section class="privacy-section">
-            <h2>8. Изменение политики</h2>
-            <p>Политика конфиденциальности может быть изменена при развитии проекта.</p>
-        </section>
+    <div class="priv-card rev">
+      <div class="priv-card-head">
+        <span class="priv-num">05</span>
+        <h2>Передача данных третьим лицам</h2>
+      </div>
+      <p>Сервис не передаёт персональные данные третьим лицам, за исключением следующего случая: результаты проверки (фотографии с разметкой и итог «чисто/грязно») автоматически отправляются контроллеру управляющей компании, к которой прикреплён сотрудник-дворник.</p>
+    </div>
 
-        <section class="privacy-section">
-            <h2>9. Контакты</h2>
-            <p>
-                Для связи с автором проекта: mautalievsaidamir@gmail.com<br>
-                VK-сообщество бота: <a href="https://vk.com/rubbish_detector" target="_blank">vk.com/rubbish_detector</a>
-            </p>
-        </section>
-    </main>
-</div>
+    <div class="priv-card rev">
+      <div class="priv-card-head">
+        <span class="priv-num">06</span>
+        <h2>Ответственность пользователя</h2>
+      </div>
+      <p>Пользователь самостоятельно несёт ответственность за содержание загружаемых изображений. Не допускается загрузка материалов, нарушающих законодательство или права третьих лиц.</p>
+    </div>
+
+    <div class="priv-card rev">
+      <div class="priv-card-head">
+        <span class="priv-num">07</span>
+        <h2>Безопасность</h2>
+      </div>
+      <p>В сервисе применяются разумные технические меры защиты, однако абсолютная безопасность передачи данных через Интернет не может быть гарантирована.</p>
+    </div>
+
+    <div class="priv-card rev">
+      <div class="priv-card-head">
+        <span class="priv-num">08</span>
+        <h2>Изменение политики</h2>
+      </div>
+      <p>Политика конфиденциальности может быть изменена при развитии проекта.</p>
+    </div>
+
+    <div class="priv-card rev">
+      <div class="priv-card-head">
+        <span class="priv-num">09</span>
+        <h2>Контакты</h2>
+      </div>
+      <p>Для связи с автором проекта: <a href="mailto:mautalievsaidamir@gmail.com">mautalievsaidamir@gmail.com</a></p>
+      <p>VK-сообщество бота: <a href="https://vk.com/rubbish_detector" target="_blank">vk.com/rubbish_detector</a></p>
+    </div>
+
+  </div>
+</section>
+
+</main>
+
+<!-- ============ FOOTER ============ -->
+<footer>
+  <div class="wrap foot">
+    <a class="logo" href="/">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="28" height="28" style="flex:none">
+        <defs><clipPath id="logo-lens-foot"><circle cx="262" cy="236" r="128"/></clipPath></defs>
+        <line x1="160" y1="334" x2="80" y2="414" stroke="#F2A14B" stroke-width="38" stroke-linecap="round"/>
+        <circle cx="262" cy="236" r="150" fill="#F2A14B"/>
+        <circle cx="262" cy="236" r="128" fill="#EAF1F8"/>
+        <g clip-path="url(#logo-lens-foot)">
+          <g transform="translate(-26.2 -23.6) scale(1.1)">
+            <path d="M232,178 C264,174 290,194 300,232 C306,248 306,262 298,274 C284,298 256,302 238,298 C210,292 194,270 192,240 C190,212 204,190 232,178 Z" fill="#2B5C8A"/>
+            <path d="M296,230 C320,230 342,238 358,250 C342,262 316,266 296,260 C299,250 297,238 296,230 Z" fill="#F2A14B"/>
+            <ellipse cx="300" cy="228" rx="11" ry="7" transform="rotate(-18 300 228)" fill="#FFFFFF"/>
+            <circle cx="268" cy="222" r="17" fill="#F2A14B"/>
+            <circle cx="268" cy="222" r="10" fill="#15243B"/>
+            <circle cx="272" cy="218" r="3.6" fill="#FFFFFF"/>
+          </g>
+        </g>
+      </svg>
+      RubbishDetector
+    </a>
+    <div class="foot-links">
+      <a href="/">Проверить фото</a>
+      <a href="/bot">VK-бот</a>
+      <a href="https://vk.com/rubbish_detector">Сообщество VK</a>
+    </div>
+    <span class="mono">© 2026 · контроль уборки на нейросетях</span>
+  </div>
+</footer>
+
+<script>
+const io=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('show');io.unobserve(e.target)}})},{threshold:.12});
+document.querySelectorAll('.rev').forEach((el,i)=>{el.style.transitionDelay=(i%3*60)+'ms';io.observe(el)});
+</script>
 </body>
 </html>
