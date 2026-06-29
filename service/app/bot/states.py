@@ -20,6 +20,9 @@ class DialogState(str, Enum):
     REG_CLEANER_CODE = "reg_cleaner_code"
     REG_CLEANER_CONSENT = "reg_cleaner_consent"
 
+    # Отзыв согласия дворника
+    CLEANER_WITHDRAW_CONFIRM = "cleaner_withdraw_confirm"
+
     # Администратор
     ADMIN_BROADCAST_TEXT = "admin_broadcast_text"
     ADMIN_BROADCAST_CONFIRM = "admin_broadcast_confirm"

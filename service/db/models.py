@@ -70,7 +70,7 @@ class Cleaner(Base):
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     company_id = Column(BigInteger, ForeignKey("company.id"), nullable=False)  # FK → company
     full_name = Column(Text, nullable=False)
-    vk_user_id = Column(BigInteger, nullable=False, unique=True)  # уникальный VK-ID дворника
+    vk_user_id = Column(BigInteger, nullable=True, unique=True)  # уникальный VK-ID дворника; NULL после отзыва согласия
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=func.now())
     consent_given_at = Column(TIMESTAMP(timezone=True), nullable=True)   # UTC-момент нажатия «Принимаю»
     consent_version = Column(Text, nullable=True)                         # версия текста согласия (напр. "v1")

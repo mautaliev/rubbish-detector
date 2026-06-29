@@ -28,6 +28,7 @@ from .keyboard import (
     consent_keyboard,
     empty_keyboard,
     role_keyboard,
+    withdraw_consent_keyboard,
 )
 from .states import DialogState, clear_session, get_session, set_state
 from .vk_api import get_photo_url, send_message, upload_doc_for_message, upload_photo_for_message
@@ -197,6 +198,12 @@ def _db_mark_notified(report_id) -> None:
         crud_report.mark_notified(db, report_id)
 
 
+def _db_withdraw_consent(vk_user_id: int) -> None:
+    """Синхронный отзыв согласия дворника: затирает ПДн и обнуляет vk_user_id."""
+    with SessionLocal() as db:
+        crud_cleaner.withdraw_consent(db, vk_user_id)
+
+
 def _db_get_statistics() -> dict:
     """Синхронный сбор статистики системы за три временных интервала.
 
@@ -291,6 +298,9 @@ async def main_handler(message: Message) -> None:
     if state == DialogState.REG_CLEANER_CONSENT:
         await _reg_cleaner_consent(message, session)
         return
+    if state == DialogState.CLEANER_WITHDRAW_CONFIRM:
+        await _cleaner_withdraw_confirm(message, session)
+        return
 
     # IDLE — проверяем, кто пишет, через БД
     company = await asyncio.to_thread(_db_get_company_by_vk, vk_user_id)
@@ -371,6 +381,21 @@ async def _handle_cleaner_message(message: Message, cleaner: CleanerRead) -> Non
     """
     api = message.ctx_api
     vk_user_id = message.from_id
+
+    text = (message.text or "").strip()
+    if text == "Отзыв согласия":
+        set_state(vk_user_id, DialogState.CLEANER_WITHDRAW_CONFIRM)
+        await send_message(
+            api,
+            vk_user_id,
+            "Вы собираетесь отозвать согласие на обработку персональных данных.\n\n"
+            "После подтверждения ваши ФИО и VK-ID будут удалены из системы. "
+            "Вы перестанете быть зарегистрированным дворником и не сможете отправлять отчёты.\n\n"
+            "Отчёты, отправленные ранее, сохранятся в обезличенном виде.\n\n"
+            "Подтвердите отзыв согласия.",
+            keyboard=withdraw_consent_keyboard(),
+        )
+        return
 
     def _is_photo(att) -> bool:
         return (att.type.value if hasattr(att.type, "value") else str(att.type)) == "photo"
@@ -955,6 +980,51 @@ async def _reg_cleaner_consent(message: Message, session: dict) -> None:
         "Для отправки отчёта просто пришлите мне фотографии убранного участка. "
         "К фото можно добавить текстовый комментарий (адрес, номер участка и т.п.).",
         keyboard=empty_keyboard(),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Отзыв согласия дворника
+# ---------------------------------------------------------------------------
+
+async def _cleaner_withdraw_confirm(message: Message, session: dict) -> None:
+    """Обрабатывает подтверждение или отмену отзыва согласия дворника.
+
+    Args:
+        message: Входящее сообщение.
+        session: Текущая сессия пользователя.
+    """
+    api = message.ctx_api
+    vk_user_id = message.from_id
+    text = (message.text or "").strip()
+
+    if text == "Отмена":
+        clear_session(vk_user_id)
+        await send_message(
+            api,
+            vk_user_id,
+            "Отзыв согласия отменён. Вы по-прежнему зарегистрированы в системе.",
+            keyboard=empty_keyboard(),
+        )
+        return
+
+    if text != "Подтвердить отзыв":
+        await send_message(
+            api,
+            vk_user_id,
+            "Пожалуйста, нажмите одну из кнопок.",
+            keyboard=withdraw_consent_keyboard(),
+        )
+        return
+
+    await asyncio.to_thread(_db_withdraw_consent, vk_user_id)
+    clear_session(vk_user_id)
+    await send_message(
+        api,
+        vk_user_id,
+        "Ваше согласие отозвано. Персональные данные удалены из системы.\n\n"
+        "Если вы захотите снова использовать бот, вам потребуется пройти регистрацию заново.",
+        keyboard=role_keyboard(),
     )
 
 

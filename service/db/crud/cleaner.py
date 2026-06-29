@@ -1,6 +1,6 @@
 """CRUD-операции для дворников."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
@@ -96,3 +96,29 @@ def count_new_since(db: Session, since: datetime) -> int:
         since: Начало периода (UTC).
     """
     return db.query(Cleaner).filter(Cleaner.created_at >= since).count()
+
+
+def withdraw_consent(db: Session, vk_user_id: int) -> CleanerRead | None:
+    """Отзывает согласие дворника: затирает ПДн, обнуляет vk_user_id.
+
+    После вызова запись остаётся в БД для сохранения истории отчётов,
+    но идентифицировать дворника по vk_user_id более невозможно.
+
+    Args:
+        db: Сессия SQLAlchemy.
+        vk_user_id: VK-ID дворника, отзывающего согласие.
+
+    Returns:
+        CleanerRead с обновлёнными данными или None, если дворник не найден.
+    """
+    cleaner = db.query(Cleaner).filter(Cleaner.vk_user_id == vk_user_id).first()
+    if cleaner is None:
+        return None
+    date_str = datetime.now(tz=timezone.utc).strftime("%d.%m.%Y")
+    cleaner.full_name = f"Согласие на хранение ПД отозвано {date_str}"
+    cleaner.vk_user_id = None
+    cleaner.consent_given_at = None
+    cleaner.consent_version = None
+    db.commit()
+    db.refresh(cleaner)
+    return CleanerRead.model_validate(cleaner)

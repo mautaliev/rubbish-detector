@@ -76,6 +76,18 @@ def confirm_broadcast_keyboard() -> str:
     return kb.get_json()
 
 
+def withdraw_consent_keyboard() -> str:
+    """Клавиатура подтверждения отзыва согласия дворника.
+
+    Returns:
+        str: JSON-строка клавиатуры VK.
+    """
+    kb = Keyboard(one_time=True)
+    kb.add(Text("Подтвердить отзыв"), color=KeyboardButtonColor.NEGATIVE)
+    kb.add(Text("Отмена"), color=KeyboardButtonColor.POSITIVE)
+    return kb.get_json()
+
+
 def empty_keyboard() -> str:
     """Пустая клавиатура для скрытия ранее показанных кнопок.
 

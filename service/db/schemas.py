@@ -55,7 +55,7 @@ class CleanerRead(BaseModel):
     id: int
     company_id: int
     full_name: str
-    vk_user_id: int
+    vk_user_id: int | None  # None после отзыва согласия
     created_at: datetime
     consent_given_at: datetime | None = None
     consent_version: str | None = None
