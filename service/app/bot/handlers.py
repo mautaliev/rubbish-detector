@@ -8,6 +8,7 @@ import os
 import random
 import string
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from textwrap import dedent
 
 from PIL import Image
@@ -645,6 +646,14 @@ async def _reg_company_name(message: Message, session: dict) -> None:
     await send_message(message.ctx_api, message.from_id, "Укажите контактный номер телефона.")
 
 
+_CONSENT_FORM_PATH = (
+    Path(__file__).resolve().parent.parent.parent.parent / "Соглашение_обработка_ПДн.docx"
+)
+_CONSENT_FORM_MIME = (
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+)
+
+
 async def _reg_company_phone(message: Message, session: dict) -> None:
     """Шаг 2 регистрации УК: получение контактного телефона.
 
@@ -657,14 +666,31 @@ async def _reg_company_phone(message: Message, session: dict) -> None:
         await send_message(message.ctx_api, message.from_id, "Пожалуйста, введите номер телефона.")
         return
     set_state(message.from_id, DialogState.REG_COMPANY_PD_FORM, company_phone=phone)
+
+    api = message.ctx_api
+    vk_user_id = message.from_id
+
+    attachment = None
+    if _CONSENT_FORM_PATH.exists():
+        try:
+            file_bytes = await asyncio.to_thread(_CONSENT_FORM_PATH.read_bytes)
+            attachment = await upload_doc_for_message(
+                api, vk_user_id, file_bytes, _CONSENT_FORM_PATH.name, _CONSENT_FORM_MIME
+            )
+        except Exception:
+            logger.error("Failed to upload consent form to VK for user %d", vk_user_id, exc_info=True)
+    else:
+        logger.warning("Consent form file not found: %s", _CONSENT_FORM_PATH)
+
     await send_message(
-        message.ctx_api,
-        message.from_id,
+        api,
+        vk_user_id,
         "Обратите внимание: все фотографии, отправленные через бот вашими сотрудниками, "
         "будут использоваться для дальнейшего обучения модели распознавания мусора.\n\n"
         "Для завершения регистрации необходимо заполнить форму-согласие на обработку "
-        "персональных данных и отправить её в ответном сообщении "
-        "(вложением в любом формате: фото, PDF, скан, документ).",
+        "персональных данных (прикреплена к этому сообщению) и отправить её в ответном "
+        "сообщении (вложением в любом формате: фото, PDF, скан, документ).",
+        attachment=attachment,
     )
 
 
