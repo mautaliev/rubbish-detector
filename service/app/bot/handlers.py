@@ -8,6 +8,7 @@ import os
 import random
 import string
 from datetime import datetime, timedelta, timezone
+from textwrap import dedent
 
 from PIL import Image
 
@@ -35,6 +36,33 @@ logger = logging.getLogger(__name__)
 labeler = BotLabeler()
 
 _MAX_FILE_BYTES = 10 * 1024 * 1024  # 10 МБ
+
+# ---------------------------------------------------------------------------
+# Согласие дворника (152-ФЗ)
+# ---------------------------------------------------------------------------
+
+CONSENT_VERSION = "v1"
+
+# Шаблон: {company_name} подставляется при показе конкретной УК.
+_CONSENT_TEMPLATE = dedent("""\
+    ══ Согласие на обработку персональных данных ══
+
+    Оператор: физическое лицо, автор сервиса RubbishDetector, Мауталиев Саидамир Ислом угли.
+
+    Я даю согласие на обработку следующих персональных данных:
+    • ФИО (из профиля ВКонтакте)
+    • VK-ID
+
+    Цель обработки: контроль качества уборки территорий.
+
+    Результаты проверки передаются управляющей компании «{company_name}».
+
+    Срок хранения: 1 год с момента регистрации.
+
+    Отозвать согласие можно в любое время, написав боту команду «Отзыв согласия» — обработка данных будет прекращена.
+
+    Нажмите «Принимаю», чтобы подтвердить согласие, или «Отмена» для отказа от регистрации.\
+""")
 
 # VK доставляет несколько фото из одного сообщения как отдельные события через long polling.
 # Буферизируем фото каждого дворника и запускаем отчёт после паузы.
@@ -124,10 +152,23 @@ def _db_create_company(name: str, phone: str, vk_user_id: int, invite_code: str)
         return crud_company.create(db, data)
 
 
-def _db_register_cleaner(vk_user_id: int, full_name: str, company_id: int) -> CleanerRead:
-    """Синхронная регистрация дворника."""
+def _db_register_cleaner(
+    vk_user_id: int,
+    full_name: str,
+    company_id: int,
+    consent_given_at: datetime,
+    consent_version: str,
+) -> CleanerRead:
+    """Синхронная регистрация дворника с фиксацией факта согласия."""
     with SessionLocal() as db:
-        return crud_cleaner.register(db, vk_user_id, full_name, company_id)
+        return crud_cleaner.register(
+            db,
+            vk_user_id,
+            full_name,
+            company_id,
+            consent_given_at=consent_given_at,
+            consent_version=consent_version,
+        )
 
 
 def _db_set_company_status(company_id: int, status: int) -> CompanyRead | None:
@@ -859,13 +900,7 @@ async def _reg_cleaner_code(message: Message, session: dict) -> None:
     await send_message(
         api,
         vk_user_id,
-        f"Вы собираетесь зарегистрироваться в компании «{company.name}».\n\n"
-        "Ваша управляющая компания уже дала согласие на обработку данных "
-        "и использование фотографий для улучшения системы распознавания.\n\n"
-        "Со своей стороны, просим вас подтвердить, что вы ознакомлены с тем, "
-        "что все отправленные вами фотографии сохраняются и могут использоваться "
-        "для обучения модели.\n"
-        "Подробнее — в политике конфиденциальности: rubbish-detector.ru/privacy",
+        _CONSENT_TEMPLATE.format(company_name=company.name),
         keyboard=consent_keyboard(),
     )
 
@@ -893,6 +928,9 @@ async def _reg_cleaner_consent(message: Message, session: dict) -> None:
     company_id = session["data"]["company_id"]
     company_name = session["data"]["company_name"]
 
+    # Фиксируем момент согласия до любых сетевых запросов
+    consent_ts = datetime.now(tz=timezone.utc)
+
     # Получаем имя из VK-профиля
     try:
         users = await api.users.get(user_ids=[vk_user_id])
@@ -900,7 +938,14 @@ async def _reg_cleaner_consent(message: Message, session: dict) -> None:
     except Exception:
         full_name = f"Пользователь VK {vk_user_id}"
 
-    await asyncio.to_thread(_db_register_cleaner, vk_user_id, full_name, company_id)
+    await asyncio.to_thread(
+        _db_register_cleaner,
+        vk_user_id,
+        full_name,
+        company_id,
+        consent_ts,
+        CONSENT_VERSION,
+    )
     clear_session(vk_user_id)
 
     await send_message(

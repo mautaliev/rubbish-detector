@@ -57,6 +57,8 @@ class CleanerRead(BaseModel):
     full_name: str
     vk_user_id: int
     created_at: datetime
+    consent_given_at: datetime | None = None
+    consent_version: str | None = None
 
     model_config = {"from_attributes": True}
 

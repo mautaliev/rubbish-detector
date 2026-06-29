@@ -72,6 +72,8 @@ class Cleaner(Base):
     full_name = Column(Text, nullable=False)
     vk_user_id = Column(BigInteger, nullable=False, unique=True)  # уникальный VK-ID дворника
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=func.now())
+    consent_given_at = Column(TIMESTAMP(timezone=True), nullable=True)   # UTC-момент нажатия «Принимаю»
+    consent_version = Column(Text, nullable=True)                         # версия текста согласия (напр. "v1")
 
     company = relationship("Company", back_populates="cleaners")
     reports = relationship("Report", back_populates="cleaner")
