@@ -25,6 +25,8 @@ class CompanyCreate(BaseModel):
     default_model: ModelVersion = ModelVersion.single_class
     phone: str | None = None
     status: int = 1  # 0=active, 1=pending, 2=denied
+    consent_given_at: datetime | None = None  # UTC-момент нажатия «Принимаю»
+    consent_version: str | None = None  # версия текста согласия УК
 
 
 class CompanyRead(BaseModel):
@@ -32,12 +34,14 @@ class CompanyRead(BaseModel):
 
     id: int
     name: str
-    vk_user_id: int
+    vk_user_id: int | None  # None после отзыва согласия контроллером
     invite_code: str
     default_model: ModelVersion
     phone: str | None
     status: int  # 0=active, 1=pending, 2=denied
     created_at: datetime
+    consent_given_at: datetime | None = None
+    consent_version: str | None = None
 
     model_config = {"from_attributes": True}
 

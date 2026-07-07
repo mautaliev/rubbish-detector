@@ -42,8 +42,8 @@ class Company(Base):
     __tablename__ = "company"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
-    name = Column(Text, nullable=False)  # название УК
-    vk_user_id = Column(BigInteger, nullable=False)  # VK-ID контроллера для уведомлений
+    name = Column(Text, nullable=False)  # название УК; «Согласие отозвано ДД.ММ.ГГГГ» после отзыва
+    vk_user_id = Column(BigInteger, nullable=True)  # VK-ID контроллера; NULL после отзыва согласия
     invite_code = Column(Text, nullable=False, unique=True)  # код регистрации дворников
     default_model = Column(
         Enum(ModelVersion, name="model_version"),
@@ -53,6 +53,8 @@ class Company(Base):
     phone = Column(Text, nullable=True)  # контактный телефон УК
     status = Column(SmallInteger, nullable=False, server_default="1")  # 0=active, 1=pending, 2=denied
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=func.now())
+    consent_given_at = Column(TIMESTAMP(timezone=True), nullable=True)  # UTC-момент нажатия «Принимаю»
+    consent_version = Column(Text, nullable=True)  # версия текста согласия УК (напр. "v1")
 
     cleaners = relationship("Cleaner", back_populates="company")
     reports = relationship("Report", back_populates="company")

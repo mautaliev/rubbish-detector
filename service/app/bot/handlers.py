@@ -8,7 +8,6 @@ import os
 import random
 import string
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from textwrap import dedent
 
 from PIL import Image
@@ -21,7 +20,7 @@ from ...db.crud import report as crud_report
 from ...db.engine import SessionLocal
 from ...db.schemas import CleanerRead, CompanyRead
 from ..report_service import create_report
-from ..storage import download, is_configured, save_agreement
+from ..storage import download
 from .keyboard import (
     admin_keyboard,
     approve_reject_keyboard,
@@ -32,40 +31,88 @@ from .keyboard import (
     withdraw_consent_keyboard,
 )
 from .states import DialogState, clear_session, get_session, set_state
-from .vk_api import get_photo_url, send_message, upload_doc_for_message, upload_photo_for_message
+from .vk_api import get_photo_url, send_message, upload_photo_for_message
 
 logger = logging.getLogger(__name__)
 labeler = BotLabeler()
 
-_MAX_FILE_BYTES = 10 * 1024 * 1024  # 10 МБ
-
 # ---------------------------------------------------------------------------
-# Согласие дворника (152-ФЗ)
+# Согласие дворника v2 (152-ФЗ, схема «я — оператор»)
 # ---------------------------------------------------------------------------
 
-CONSENT_VERSION = "v1"
+CONSENT_VERSION = "v2"
 
 # Шаблон: {company_name} подставляется при показе конкретной УК.
 _CONSENT_TEMPLATE = dedent("""\
     ══ Согласие на обработку персональных данных ══
 
-    Оператор: «{company_name}».
+    Оператор: Мауталиев Саидамир Ислом угли, физическое лицо, ИНН 861008622566,
+    контакт: mautalievsaidamir@gmail.com — автор и оператор сервиса «RubbishDetector».
 
-    Обработчик (по поручению Оператора): физическое лицо, автор сервиса RubbishDetector, Мауталиев Саидамир Ислом угли.
-
-    Я даю согласие Оператору на обработку следующих персональных данных:
+    Я даю Оператору согласие на обработку следующих персональных данных:
     • ФИО (из профиля ВКонтакте)
     • VK-ID
+    • фотографии убранных территорий в составе моих отчётов
+      (фотографии связаны с моей учётной записью, датой и результатом
+      проверки; перед сохранением лица людей и автомобильные номера
+      на фотографиях необратимо обезличиваются)
 
-    Цель обработки: контроль качества уборки территорий.
+    Цели обработки:
+    • контроль качества уборки территорий;
+    • передача результатов проверки (фотографий с разметкой и итога
+      «чисто/грязно») представителю управляющей компании
+      «{company_name}», к которой я прикреплён;
+    • улучшение качества распознавания: обезличенные копии фотографий
+      могут использоваться для обучения модели.
 
-    Обработка осуществляется Оператором с привлечением Обработчика в рамках сервиса «RubbishDetector».
+    Срок хранения: 3 года с момента получения.
 
-    Срок хранения: 1 год с момента регистрации.
+    Отозвать согласие можно в любое время командой «Отзыв согласия»
+    в этом боте. При отзыве идентифицирующие данные (ФИО, VK-ID)
+    удаляются; обезличенная запись сохраняется для истории отчётов.
 
-    Отозвать согласие можно в любое время, написав боту команду «Отзыв согласия» — обработка данных будет прекращена.
+    Нажмите «Принимаю», чтобы подтвердить согласие,
+    или «Отмена» для отказа от регистрации.\
+""")
 
-    Нажмите «Принимаю», чтобы подтвердить согласие, или «Отмена» для отказа от регистрации.\
+# ---------------------------------------------------------------------------
+# Согласие контроллера УК v1 (152-ФЗ, схема «я — оператор»)
+# ---------------------------------------------------------------------------
+
+COMPANY_CONSENT_VERSION = "v1"
+
+# Шаблон: {company_name} подставляется по введённому пользователем названию.
+_COMPANY_CONSENT_TEMPLATE = dedent("""\
+    ══ Согласие на обработку персональных данных ══
+
+    Оператор: Мауталиев Саидамир Ислом угли, физическое лицо, ИНН 861008622566,
+    контакт: mautalievsaidamir@gmail.com — автор и оператор сервиса «RubbishDetector».
+
+    Я, представитель управляющей компании «{company_name}», даю
+    Оператору согласие на обработку моих персональных данных:
+    • VK-ID
+    • контактный телефон
+
+    Цель обработки: регистрация компании в сервисе, направление
+    уведомлений о результатах проверки уборки, служебные сообщения.
+
+    Срок хранения: 3 года с момента получения.
+
+    Отозвать согласие можно в любое время, направив письмо на адрес
+    mautalievsaidamir@gmail.com с указанием названия компании. Обработка
+    будет прекращена в срок не более 30 дней с момента получения письма.
+    Обратите внимание: при отзыве компания отключается от сервиса,
+    её сотрудники теряют возможность направлять отчёты.
+
+    Обратите внимание: фотографии, направляемые вашими сотрудниками,
+    после необратимого обезличивания (лица и автомобильные номера)
+    могут использоваться для обучения и улучшения модели распознавания.
+
+    Сотрудники дают собственное согласие на обработку своих данных
+    при регистрации в боте.
+
+    Нажмите «Принимаю» для завершения регистрации
+    или «Отмена» для отказа.\
 """)
 
 # VK доставляет несколько фото из одного сообщения как отдельные события через long polling.
@@ -142,8 +189,24 @@ def _db_get_company_by_invite(invite_code: str) -> CompanyRead | None:
         return None
 
 
-def _db_create_company(name: str, phone: str, vk_user_id: int, invite_code: str) -> CompanyRead:
-    """Синхронное создание записи УК со статусом pending."""
+def _db_create_company(
+    name: str,
+    phone: str,
+    vk_user_id: int,
+    invite_code: str,
+    consent_given_at: datetime,
+    consent_version: str,
+) -> CompanyRead:
+    """Синхронное создание записи УК со статусом pending и зафиксированным согласием.
+
+    Args:
+        name: Название управляющей компании.
+        phone: Контактный телефон контроллера.
+        vk_user_id: VK-ID контроллера.
+        invite_code: Уникальный invite-код для подключения дворников.
+        consent_given_at: UTC-момент нажатия «Принимаю».
+        consent_version: Версия текста согласия (напр. 'v1').
+    """
     from ...db.schemas import CompanyCreate
     data = CompanyCreate(
         name=name,
@@ -151,6 +214,8 @@ def _db_create_company(name: str, phone: str, vk_user_id: int, invite_code: str)
         invite_code=invite_code,
         phone=phone,
         status=1,
+        consent_given_at=consent_given_at,
+        consent_version=consent_version,
     )
     with SessionLocal() as db:
         return crud_company.create(db, data)
@@ -292,8 +357,8 @@ async def main_handler(message: Message) -> None:
     if state == DialogState.REG_COMPANY_PHONE:
         await _reg_company_phone(message, session)
         return
-    if state == DialogState.REG_COMPANY_PD_FORM:
-        await _reg_company_pd_form(message, session)
+    if state == DialogState.REG_COMPANY_CONSENT:
+        await _reg_company_consent(message, session)
         return
     if state == DialogState.REG_CLEANER_CODE:
         await _reg_cleaner_code(message, session)
@@ -534,12 +599,17 @@ async def _process_report(api, vk_user_id: int, cleaner: CleanerRead, photo_atts
         )
         return
 
-    # Получаем модель компании
-    company = await asyncio.to_thread(_db_get_company_by_vk, cleaner.company_id)
-    # company_id у дворника и vk_user_id УК — разные поля; ищем по ID
     company = await asyncio.to_thread(_db_get_company_by_id, cleaner.company_id)
     if company is None:
         logger.error("Company %d not found for cleaner %d", cleaner.company_id, cleaner.id)
+        return
+    if company.status != 0:
+        await send_message(
+            api,
+            vk_user_id,
+            "Ваша управляющая компания отключена от сервиса. "
+            "Отправка отчётов недоступна.",
+        )
         return
 
     try:
@@ -581,6 +651,9 @@ async def _notify_company(api, cleaner: CleanerRead, company: CompanyRead, repor
         report: Созданный отчёт из БД.
     """
     controller_vk_id = company.vk_user_id
+    if controller_vk_id is None:
+        logger.warning("Company %d has no vk_user_id, skipping notification", company.id)
+        return
     date_str = report.created_at.strftime("%d.%m.%Y %H:%M")
     comment_str = report.comment or "—"
 
@@ -648,16 +721,11 @@ async def _reg_company_name(message: Message, session: dict) -> None:
     await send_message(message.ctx_api, message.from_id, "Укажите контактный номер телефона.")
 
 
-_CONSENT_FORM_PATH = (
-    Path(__file__).resolve().parent.parent.parent.parent / "Соглашение_обработка_ПДн.docx"
-)
-_CONSENT_FORM_MIME = (
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-)
-
-
 async def _reg_company_phone(message: Message, session: dict) -> None:
     """Шаг 2 регистрации УК: получение контактного телефона.
+
+    После ввода телефона показывает текст согласия на обработку ПДн
+    с кнопками «Принимаю / Отмена».
 
     Args:
         message: Входящее сообщение.
@@ -667,189 +735,25 @@ async def _reg_company_phone(message: Message, session: dict) -> None:
     if not phone:
         await send_message(message.ctx_api, message.from_id, "Пожалуйста, введите номер телефона.")
         return
-    set_state(message.from_id, DialogState.REG_COMPANY_PD_FORM, company_phone=phone)
 
     api = message.ctx_api
     vk_user_id = message.from_id
+    company_name = session["data"]["company_name"]
 
-    attachment = None
-    if _CONSENT_FORM_PATH.exists():
-        try:
-            file_bytes = await asyncio.to_thread(_CONSENT_FORM_PATH.read_bytes)
-            attachment = await upload_doc_for_message(
-                api, vk_user_id, file_bytes, _CONSENT_FORM_PATH.name, _CONSENT_FORM_MIME
-            )
-        except Exception:
-            logger.error("Failed to upload consent form to VK for user %d", vk_user_id, exc_info=True)
-    else:
-        logger.warning("Consent form file not found: %s", _CONSENT_FORM_PATH)
-
+    set_state(vk_user_id, DialogState.REG_COMPANY_CONSENT, company_phone=phone)
     await send_message(
         api,
         vk_user_id,
-        "Обратите внимание: все фотографии, отправленные через бот вашими сотрудниками, "
-        "будут использоваться для дальнейшего обучения модели распознавания мусора.\n\n"
-        "Для завершения регистрации необходимо заполнить форму-согласие на обработку "
-        "персональных данных (прикреплена к этому сообщению) и отправить её в ответном "
-        "сообщении (вложением в любом формате: фото, PDF, скан, документ).",
-        attachment=attachment,
+        _COMPANY_CONSENT_TEMPLATE.format(company_name=company_name),
+        keyboard=consent_keyboard(),
     )
 
 
-async def _download_pd_files(attachments) -> list[dict]:
-    """Скачивает вложения формы ПД из VK CDN, возвращает список файлов с байтами.
+async def _reg_company_consent(message: Message, session: dict) -> None:
+    """Шаг 3 регистрации УК: подтверждение согласия на обработку ПДн контроллера.
 
-    Поддерживает фото и документы. Файлы, превышающие _MAX_FILE_BYTES,
-    пропускаются (размер уже проверен в _check_attachment_sizes, это страховка).
-
-    Args:
-        attachments: Список объектов вложений из входящего VK-сообщения.
-
-    Returns:
-        list[dict]: Каждый элемент содержит 'bytes', 'file_name', 'content_type', 'att_type'.
-    """
-    import mimetypes
-    import aiohttp
-
-    result = []
-    async with aiohttp.ClientSession() as http:
-        for att in attachments or []:
-            att_type = att.type.value if hasattr(att.type, "value") else str(att.type)
-            url = file_name = None
-            content_type = "application/octet-stream"
-
-            if att_type == "photo" and att.photo:
-                url = get_photo_url(att.photo)
-                file_name = f"photo_{att.photo.id}.jpg"
-                content_type = "image/jpeg"
-            elif att_type == "doc" and att.doc:
-                url = att.doc.url
-                ext = att.doc.ext or "bin"
-                file_name = f"doc_{att.doc.id}.{ext}"
-                content_type = mimetypes.guess_type(file_name)[0] or "application/octet-stream"
-
-            if not url or not file_name:
-                continue
-
-            try:
-                async with http.get(url) as resp:
-                    if resp.status != 200:
-                        logger.error(
-                            "Failed to download %s: HTTP %d", file_name, resp.status
-                        )
-                        continue
-                    file_bytes = await resp.read()
-                if not file_bytes:
-                    logger.error("Downloaded empty file for %s, skipping", file_name)
-                    continue
-                if len(file_bytes) > _MAX_FILE_BYTES:
-                    logger.warning("Agreement file %s exceeds 10 MB limit, skipping", file_name)
-                    continue
-                result.append({
-                    "bytes": file_bytes,
-                    "file_name": file_name,
-                    "content_type": content_type,
-                    "att_type": att_type,
-                })
-            except Exception:
-                logger.error("Failed to download agreement file %s", file_name, exc_info=True)
-
-    return result
-
-
-async def _save_pd_bytes_to_s3(files: list[dict], company_id: int) -> None:
-    """Сохраняет скачанные файлы согласия в S3.
-
-    Args:
-        files: Список файлов из _download_pd_files.
-        company_id: ID компании — используется в пути S3.
-    """
-    if not is_configured():
-        logger.warning("S3 not configured, skipping agreement save for company %d", company_id)
-        return
-    for f in files:
-        try:
-            await save_agreement(company_id, f["bytes"], f["file_name"], f["content_type"])
-            logger.info("Saved agreement file %s for company %d", f["file_name"], company_id)
-        except Exception:
-            logger.error(
-                "Failed to save agreement file %s to S3 for company %d",
-                f["file_name"], company_id,
-                exc_info=True,
-            )
-
-
-async def _upload_pd_to_vk(api, admin_id: int, files: list[dict]) -> str:
-    """Загружает файлы согласия в VK как собственные вложения бота.
-
-    Фото загружаются через Photos API, документы — через Docs API.
-    Ошибка отдельного файла не прерывает загрузку остальных.
-
-    Args:
-        api: VK API.
-        admin_id: VK-ID администратора (peer_id для загрузки).
-        files: Список файлов из _download_pd_files.
-
-    Returns:
-        str: Строка вложений вида 'photo123_456,doc789_012' для messages.send.
-    """
-    parts = []
-    for f in files:
-        try:
-            if f["att_type"] == "photo":
-                photo_bytes = await asyncio.to_thread(_to_vk_jpeg, f["bytes"])
-                att_str = await upload_photo_for_message(api, admin_id, photo_bytes)
-            else:
-                att_str = await upload_doc_for_message(
-                    api, admin_id, f["bytes"], f["file_name"], f["content_type"]
-                )
-            parts.append(att_str)
-        except Exception:
-            logger.error("Failed to upload agreement file %s to VK", f["file_name"], exc_info=True)
-    return ",".join(parts)
-
-
-async def _check_attachment_sizes(attachments) -> bool:
-    """Проверяет, что ни одно вложение не превышает _MAX_FILE_BYTES.
-
-    Для документов размер берётся из метаданных VK без сетевого запроса.
-    Для фото выполняется HEAD-запрос к CDN VK за заголовком Content-Length.
-    Если размер определить не удалось, вложение считается допустимым —
-    финальный контроль остаётся на стороне _download_pd_files.
-
-    Args:
-        attachments: Список объектов вложений из входящего VK-сообщения.
-
-    Returns:
-        bool: True, если все вложения в пределах лимита; False, если хотя бы одно превышает.
-    """
-    import aiohttp
-
-    async with aiohttp.ClientSession() as http:
-        for att in attachments or []:
-            att_type = att.type.value if hasattr(att.type, "value") else str(att.type)
-
-            if att_type == "doc" and att.doc:
-                if att.doc.size and att.doc.size > _MAX_FILE_BYTES:
-                    return False
-
-            elif att_type == "photo" and att.photo:
-                url = get_photo_url(att.photo)
-                if not url:
-                    continue
-                try:
-                    async with http.head(url) as resp:
-                        declared = resp.headers.get("Content-Length")
-                        if declared and int(declared) > _MAX_FILE_BYTES:
-                            return False
-                except Exception:
-                    logger.warning("HEAD request failed for photo size check: %s", url)
-
-    return True
-
-
-async def _reg_company_pd_form(message: Message, session: dict) -> None:
-    """Шаг 3 регистрации УК: получение подписанной формы ПД.
+    По нажатию «Принимаю» фиксирует consent_given_at и создаёт запись УК
+    со статусом pending. Карточку без вложений отправляет администратору.
 
     Args:
         message: Входящее сообщение.
@@ -857,36 +761,28 @@ async def _reg_company_pd_form(message: Message, session: dict) -> None:
     """
     api = message.ctx_api
     vk_user_id = message.from_id
+    text = (message.text or "").strip()
 
-    if not message.attachments:
-        await send_message(api, vk_user_id, "Пожалуйста, прикрепите заполненную форму согласия.")
+    if text == "Отмена":
+        clear_session(vk_user_id)
+        await send_message(api, vk_user_id, "Регистрация отменена.", keyboard=role_keyboard())
         return
 
-    if not await _check_attachment_sizes(message.attachments):
-        await send_message(
-            api,
-            vk_user_id,
-            "Файл слишком большой. Максимальный размер — 10 МБ. "
-            "Пожалуйста, прикрепите файл меньшего размера.",
-        )
+    if text != "Принимаю":
+        await send_message(api, vk_user_id, "Пожалуйста, нажмите одну из кнопок.", keyboard=consent_keyboard())
         return
 
     name = session["data"]["company_name"]
     phone = session["data"]["company_phone"]
     invite_code = _gen_invite_code()
 
+    # Фиксируем момент согласия до любых сетевых запросов
+    consent_ts = datetime.now(tz=timezone.utc)
+
     company = await asyncio.to_thread(
-        _db_create_company, name, phone, vk_user_id, invite_code
+        _db_create_company, name, phone, vk_user_id, invite_code, consent_ts, COMPANY_CONSENT_VERSION
     )
 
-    # Скачиваем файлы один раз — байты используем для S3 и для VK upload
-    files = await _download_pd_files(message.attachments)
-
-    # Сохраняем в S3 в фоне (байты уже есть, повторного скачивания нет)
-    if files:
-        asyncio.create_task(_save_pd_bytes_to_s3(files, company.id))
-
-    # Загружаем в VK как собственные файлы бота и уведомляем администратора
     admin_id = _admin_vk_id()
     if admin_id:
         admin_text = (
@@ -896,11 +792,9 @@ async def _reg_company_pd_form(message: Message, session: dict) -> None:
             f"VK: vk.com/id{vk_user_id}"
         )
         try:
-            attachment = await _upload_pd_to_vk(api, admin_id, files) or None
             await api.messages.send(
                 user_id=admin_id,
                 message=admin_text,
-                attachment=attachment,
                 keyboard=approve_reject_keyboard(company.id),
                 random_id=0,
             )
@@ -1050,8 +944,9 @@ async def _cleaner_withdraw_confirm(message: Message, session: dict) -> None:
     await send_message(
         api,
         vk_user_id,
-        "Ваше согласие отозвано. Персональные данные удалены из системы.\n\n"
-        "Если вы захотите снова использовать бот, вам потребуется пройти регистрацию заново.",
+        "Ваше согласие отозвано. Идентифицирующие данные (ФИО, VK-ID) удалены "
+        "из системы; обезличенная запись сохранена для истории отчётов.\n\n"
+        "Для повторного использования бота потребуется заново пройти регистрацию.",
         keyboard=role_keyboard(),
     )
 

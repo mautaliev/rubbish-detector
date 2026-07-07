@@ -93,7 +93,10 @@ async def download(key: str) -> bytes:
 
 
 async def save_agreement(company_id: int, file_bytes: bytes, file_name: str, content_type: str = "application/octet-stream") -> str:
-    """Сохраняет файл согласия на ПД в S3 по пути agreements/{company_id}/{file_name}.
+    """[LEGACY] Сохраняет файл согласия на ПД в S3 по пути agreements/{company_id}/{file_name}.
+
+    Не вызывается начиная с миграции на схему «оператор» (v2 согласия, миграция 0005).
+    Оставлена для истории; существующие объекты в S3 под префиксом agreements/ не удаляются.
 
     Args:
         company_id: ID управляющей компании.

@@ -14,7 +14,7 @@ class DialogState(str, Enum):
     # Регистрация УК
     REG_COMPANY_NAME = "reg_company_name"
     REG_COMPANY_PHONE = "reg_company_phone"
-    REG_COMPANY_PD_FORM = "reg_company_pd_form"
+    REG_COMPANY_CONSENT = "reg_company_consent"
 
     # Регистрация сотрудника
     REG_CLEANER_CODE = "reg_cleaner_code"
