@@ -641,6 +641,41 @@ def _db_get_company_by_id(company_id: int) -> CompanyRead | None:
         return crud_company.get_by_id(db, company_id)
 
 
+async def _upload_photo_with_retry(
+    api,
+    peer_id: int,
+    photo_bytes: bytes,
+    key: str,
+    *,
+    attempts: int = 5,
+    delay: float = 2.0,
+) -> str | None:
+    """Пытается загрузить фото в VK до `attempts` раз с паузой `delay` секунд.
+
+    Args:
+        api: VK API объект.
+        peer_id: VK-ID получателя (peer_id для photos.getMessagesUploadServer).
+        photo_bytes: Байты JPEG-изображения.
+        key: S3-ключ фото (только для логирования).
+        attempts: Максимальное число попыток (по умолчанию 5).
+        delay: Пауза между попытками в секундах.
+
+    Returns:
+        str | None: Строка вложения ('photo<owner>_<id>') или None после всех неудач.
+    """
+    for attempt in range(1, attempts + 1):
+        try:
+            return await upload_photo_for_message(api, peer_id, photo_bytes)
+        except Exception:
+            logger.warning(
+                "VK photo upload attempt %d/%d failed for key %s",
+                attempt, attempts, key, exc_info=True,
+            )
+            if attempt < attempts:
+                await asyncio.sleep(delay)
+    return None
+
+
 async def _notify_company(api, cleaner: CleanerRead, company: CompanyRead, report) -> None:
     """Отправляет уведомление контроллеру УК с фото и результатом проверки.
 
@@ -684,10 +719,12 @@ async def _notify_company(api, cleaner: CleanerRead, company: CompanyRead, repor
         try:
             photo_bytes = await download(key)
             photo_bytes = await asyncio.to_thread(_to_vk_jpeg, photo_bytes)
-            att_str = await upload_photo_for_message(api, controller_vk_id, photo_bytes)
-            attachment_parts.append(att_str)
         except Exception:
-            logger.error("Failed to upload photo to VK for key %s", key, exc_info=True)
+            logger.error("Failed to download/convert photo for key %s", key, exc_info=True)
+            continue
+        att_str = await _upload_photo_with_retry(api, controller_vk_id, photo_bytes, key)
+        if att_str is not None:
+            attachment_parts.append(att_str)
 
     attachment = ",".join(attachment_parts) if attachment_parts else None
 
